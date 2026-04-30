@@ -1,0 +1,181 @@
+# /home/bk_ids/bk-ids/docker-compose.yml
+# ========================================================================
+# BK-IDS SOC: ENTERPRISE DOCKER COMPOSE ARCHITECTURE (FAIL-OPEN & SELF-HEALING)
+# ========================================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # 1. CƠ SỞ DỮ LIỆU MYSQL
+  mysql_db:
+    image: mysql:8.0
+    container_name: bkids_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "127.0.0.1:3306:3306"  
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - bkids_network
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. REDIS CACHE
+  redis_cache:
+    image: redis:7-alpine
+    container_name: bkids_redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"  
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - bkids_network
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # 3. GIAO DIỆN HIỂN THỊ (VUEJS / NGINX)
+  frontend_ui:
+    image: nginx:alpine
+    container_name: bkids_frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./web_dashboard/frontend:/usr/share/nginx/html:ro
+    networks:
+      - bkids_network
+    logging: *default-logging
+    depends_on:
+      - api_server
+
+  # 4. LÕI API BACKEND (FLASK)
+  api_server:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      network: host
+    container_name: bkids_api
+    restart: unless-stopped
+    env_file: .env
+    pid: "host" 
+    ports:
+      - "5050:5000"
+    networks:
+      - bkids_network
+    volumes:
+      - ./:/app 
+    working_dir: /app/web_dashboard/backend_api 
+    command: /bin/sh -c "pip install pymysql --break-system-packages 2>/dev/null || pip install pymysql; python3 api_server.py"
+    logging: *default-logging
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+
+  # 5. HỆ THỐNG PHÁT HIỆN BẤT THƯỜNG (CUSUM SENSOR)
+  anomaly_sensor:
+    build:
+      context: .
+      dockerfile: Dockerfile.sensor
+      network: host
+    container_name: bkids_anomaly_sensor
+    restart: unless-stopped
+    env_file: .env
+    network_mode: "host" 
+    privileged: true 
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    extra_hosts:
+      - "mysql_db:127.0.0.1"
+      - "redis_cache:127.0.0.1"
+    volumes:
+      - ./:/app
+    working_dir: /app/core_engine
+    # 🎯 FIX LOG: Thêm cờ -u vào python3 để ép đẩy log ra ngoài thay vì ngâm trong buffer
+    command: python3 -u sensor_ids.py
+    environment:
+      - SNIFF_INTERFACE=ens33 
+    logging: *default-logging
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+
+  # 6. HỆ THỐNG NGĂN CHẶN LẠM DỤNG (INLINE IPS)
+  misuse_ips:
+    build:
+      context: .
+      dockerfile: Dockerfile.sensor
+      network: host
+    container_name: bkids_misuse_ips
+    restart: unless-stopped
+    env_file: .env
+    network_mode: "host" 
+    privileged: true 
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    extra_hosts:
+      - "mysql_db:127.0.0.1"
+      - "redis_cache:127.0.0.1"
+    volumes:
+      - ./:/app
+      - /var/log/snort:/var/log/snort
+    working_dir: /app/core_engine
+    # 🎯 FIX LOG & ENTRYPOINT: Thêm cờ -u vào python3
+    command: /bin/sh -c "iptables -D INPUT -p tcp -m multiport --dports 8080,5000 -j NFQUEUE --queue-num 0 --queue-bypass 2>/dev/null || true; iptables -I INPUT -p tcp -m multiport --dports 8080,5000 -j NFQUEUE --queue-num 0 --queue-bypass; python3 -u inline_ips.py"
+    environment:
+      - SNIFF_INTERFACE=ens33
+    logging: *default-logging
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+
+  # 7. LỚP GIÁP WAF & SSL TERMINATION (NGINX + MODSECURITY)
+  waf_proxy:
+    image: owasp/modsecurity-crs:nginx-alpine
+    container_name: bkids_waf_proxy
+    restart: unless-stopped
+    ports:
+      - "80:8080"    
+    environment:
+      - PORT=8080
+      - SEC_RULE_ENGINE=On
+      - BACKEND=http://bkids_frontend:80 
+      - PARANOIA=2
+    volumes:
+      - ./waf_config/nginx.conf:/etc/nginx/templates/conf.d/default.conf.template:ro
+    networks:
+      - bkids_network
+    logging: *default-logging
+    depends_on:
+      - frontend_ui
+      - api_server
+
+# =========================================
+# BẮT BUỘC PHẢI CÓ KHỐI NÀY Ở CUỐI FILE
+# =========================================
+networks:
+  bkids_network:
+    driver: bridge
+
+volumes:
+  mysql_data:

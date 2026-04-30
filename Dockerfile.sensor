@@ -1,0 +1,53 @@
+# /home/bk_ids/bk-ids/Dockerfile.sensor
+
+# Sử dụng Base Image chính thức của Snort 3 từ Cisco Talos
+FROM ciscotalos/snort3:latest
+
+# 🎯 Chiếm lại quyền root để cài đặt phần mềm và can thiệp Iptables
+USER root
+
+# Tắt các thông báo tương tác khi cài gói trên Linux
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Cài đặt các công cụ biên dịch (Compiler) và thư viện NFQUEUE
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    iptables \
+    net-tools \
+    iputils-ping \
+    tcpdump \
+    libnetfilter-queue-dev \
+    libmnl-dev \
+    build-essential \
+    autoconf \
+    libtool \
+    git \
+    pkg-config \
+    kmod \
+    && rm -rf /var/lib/apt/lists/*
+
+# 🎯 FIX CHÍ MẠNG LỖI DAQ NFQ: 
+# Ép biên dịch libdaq nhắm thẳng vào thư mục lõi của Cisco (--prefix và --libdir)
+RUN git clone https://github.com/snort3/libdaq.git /tmp/libdaq \
+    && cd /tmp/libdaq \
+    && ./bootstrap \
+    && ./configure --prefix=/home/snorty/snort3 --libdir=/home/snorty/snort3/lib \
+    && make \
+    && make install \
+    && ldconfig \
+    && rm -rf /tmp/libdaq
+
+# Gắn chặt đường dẫn thư viện để Linux linker không bị nhầm lẫn
+ENV LD_LIBRARY_PATH=/home/snorty/snort3/lib:$LD_LIBRARY_PATH
+
+# Cài đặt các thư viện lõi của dự án BK-IDS
+RUN pip3 install --no-cache-dir --break-system-packages pymysql psutil requests python-dotenv cryptography
+
+WORKDIR /app
+
+# Xóa ENTRYPOINT mặc định của Cisco để không xung đột với docker-compose
+ENTRYPOINT []
+
+# Lệnh chờ vô tận để giữ container luôn sống
+CMD ["tail", "-f", "/dev/null"]

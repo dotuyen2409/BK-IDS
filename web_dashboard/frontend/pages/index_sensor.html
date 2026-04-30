@@ -1,0 +1,450 @@
+<!-- /home/bk_ids/bk-ids/web_dashboard/frontend/pages/index_sensor.html -->
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>PASSIVE SENSOR - Bk-IDS SOC Enterprise</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ==========================================
+           ENTERPRISE SOC THEME CONFIGURATION
+           ========================================== */
+        :root {
+            --bg-base: #020617;        /* Slate 950 */
+            --bg-surface: #0f172a;     /* Slate 900 */
+            --bg-elevated: #1e293b;    /* Slate 800 */
+            --border-subtle: #334155;  /* Slate 700 */
+            --text-main: #f8fafc;      /* Slate 50 */
+            --text-muted: #94a3b8;     /* Slate 400 */
+            
+            --accent-cyan: #06b6d4;    /* Cyan - Primary for Sensor */
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --accent-green: #10b981;
+            --accent-purple: #a855f7;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; height: 100vh; overflow: hidden; 
+            background-color: var(--bg-base); font-family: 'Inter', sans-serif; color: var(--text-main);
+        }
+        
+        #app { display: flex; height: 100vh; width: 100vw; }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-base); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: 250px; background: var(--bg-surface); border-right: 1px solid var(--border-subtle);
+            display: flex; flex-direction: column; padding: 20px 0; z-index: 100;
+        }
+        .brand { text-align: center; padding-bottom: 20px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 15px; }
+        .nav-link {
+            display: block; padding: 10px 20px; color: var(--text-muted); text-decoration: none; 
+            font-size: 0.9rem; font-weight: 500; transition: 0.2s;
+        }
+        .nav-link:hover { color: var(--text-main); background: rgba(255,255,255,0.02); }
+        .nav-link.active {
+            color: var(--text-main); background: rgba(6, 182, 212, 0.1); border-left: 3px solid var(--accent-cyan); font-weight: 600;
+        }
+
+        /* Main Content */
+        .main-content { 
+            flex: 1; height: 100vh; overflow-y: auto; padding: 30px; box-sizing: border-box; scroll-behavior: smooth;
+        }
+        
+        /* Header & Badges */
+        .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+        .badge-container { display: flex; gap: 12px; }
+        .status-badge {
+            padding: 6px 14px; border-radius: 50px; background: var(--bg-surface); 
+            border: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 8px;
+            font-weight: 600; font-size: 0.8rem; letter-spacing: 0.5px;
+        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+        /* Card Styling */
+        .card {
+            background: var(--bg-surface); border: 1px solid var(--border-subtle); 
+            border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5); margin-bottom: 20px;
+        }
+        .card-title { margin: 0 0 15px 0; font-size: 1.05rem; font-weight: 600; color: var(--text-main); }
+
+        /* Control Toolbar */
+        .toolbar { display: flex; justify-content: space-between; align-items: center; }
+        .mode-toggle { display: flex; background: var(--bg-base); border-radius: 8px; padding: 4px; border: 1px solid var(--border-subtle); }
+        .mode-btn { 
+            background: transparent; border: none; color: var(--text-muted); padding: 8px 16px; 
+            border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: 0.2s;
+        }
+        .mode-btn.active { background: var(--accent-cyan); color: #000; box-shadow: 0 2px 4px rgba(6, 182, 212, 0.3); }
+        .date-picker { 
+            background: var(--bg-base); border: 1px solid var(--border-subtle); color: var(--text-main); 
+            padding: 8px 12px; border-radius: 6px; outline: none; font-family: 'Inter', sans-serif; color-scheme: dark;
+        }
+        .btn-outline { 
+            background: transparent; border: 1px solid var(--border-subtle); color: var(--text-main); 
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: 0.2s;
+        }
+        .btn-outline:hover { background: var(--bg-elevated); border-color: var(--text-muted); }
+
+        /* Stats Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .stat-card { position: relative; overflow: hidden; }
+        .stat-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; }
+        .stat-card.alert::before { background: var(--accent-red); }
+        .stat-card.threshold::before { background: var(--accent-yellow); }
+        .stat-card.status::before { background: var(--accent-cyan); }
+        .big-number { font-size: 2.2rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-top: 10px; }
+
+        /* Firewall Panel */
+        .firewall-panel { 
+            border-left: 4px solid var(--accent-green); transition: all 0.3s ease;
+        }
+        .firewall-panel.has-blocks { 
+            border-left-color: var(--accent-red); 
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.05) 0%, var(--bg-surface) 100%);
+        }
+        .blocked-ip-container { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 15px; }
+        .blocked-tag {
+            display: flex; align-items: center; justify-content: space-between; gap: 15px;
+            background: var(--bg-base); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; 
+            padding: 12px 16px; min-width: 250px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .blocked-tag:hover { border-color: var(--accent-red); }
+        .tag-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; display: block;}
+        .tag-ip { color: #fca5a5; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.1rem; }
+        .btn-unblock {
+            background: rgba(34, 197, 94, 0.1); color: var(--accent-green); border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: 0.2s;
+        }
+        .btn-unblock:hover { background: var(--accent-green); color: #fff; box-shadow: 0 0 10px rgba(34, 197, 94, 0.3); }
+
+        /* Charts */
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;}
+        .chart-full { grid-column: 1 / -1; }
+        .chart-container { height: 220px; width: 100%; position: relative; }
+
+        /* Table */
+        .table-container { border: 1px solid var(--border-subtle); border-radius: 8px; overflow: hidden; background: var(--bg-base); }
+        .soc-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        .soc-table th { 
+            padding: 12px 16px; color: var(--text-muted); font-weight: 600; background: var(--bg-elevated); 
+            text-transform: uppercase; font-size: 0.75rem; border-bottom: 1px solid var(--border-subtle); letter-spacing: 0.5px;
+        }
+        .soc-table td { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle;}
+        .soc-table tr:hover td { background: rgba(255,255,255,0.02); }
+        .log-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .badge-status { padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.7rem; letter-spacing: 0.5px; display: inline-flex; align-items: center; justify-content: center; width: 100px; }
+        .status-err { background: rgba(239, 68, 68, 0.1); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .status-ok { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <aside class="sidebar">
+            <div class="brand">
+                <span style="font-size: 1.2rem; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px;"> Bk-IDS SOC</span>
+            </div>
+            <a href="index.html" class="nav-link">⌂ Tổng quan (Dashboard)</a>
+            <div style="margin-top: 20px;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Lõi Cảm Biến</div>
+                <a href="capture-config.html" class="nav-link">⚙ Cấu hình Bắt gói tin</a>
+            </div>
+            <div style="margin-top: 20px;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện Bất thường</div>
+                <a href="index_sensor.html" class="nav-link active">Theo Dõi Cảm Biến</a>
+                <a href="anomaly-config.html" class="nav-link">Cấu hình Ngưỡng</a>
+            </div>
+            <div style="margin-top: 20px;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện Lạm dụng</div>
+                <a href="index_ips.html" class="nav-link">Theo Dõi IPS</a>
+                <a href="rules-config.html" class="nav-link">Cài đặt Luật (Snort 3)</a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="header-top">
+                <div>
+                    <h2 style="margin: 0 0 8px 0; font-size: 1.5rem; font-weight: 600;">Hệ Thống Phân Tích Bất Thường (Python CuSUM Engine)</h2>
+                    <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem;">Tính toán Entropy phân tán IP, nhận diện rà quét mạng (Network Scan) & Volume-based DDoS.</p>
+                </div>
+                <div class="badge-container">
+                    <div class="status-badge" style="color: var(--accent-blue);">
+                        <div class="status-dot" style="background-color: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue);"></div>
+                        SNORT 3: SYNCED
+                    </div>
+                    <div class="status-badge" :style="{ color: isConnected ? 'var(--accent-green)' : 'var(--accent-red)' }">
+                        <div class="status-dot" :style="{ backgroundColor: isConnected ? 'var(--accent-green)' : 'var(--accent-red)', boxShadow: isConnected ? '0 0 8px var(--accent-green)' : '0 0 8px var(--accent-red)' }"></div>
+                        {{ isConnected ? 'CUSUM ENGINE: ONLINE' : 'CUSUM ENGINE: OFFLINE' }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="padding: 16px 24px;">
+                <div class="toolbar">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px;">CHẾ ĐỘ GIÁM SÁT:</span>
+                        <div class="mode-toggle">
+                            <button @click="setMode('live')" class="mode-btn" :class="{'active': currentMode === 'live'}">🔴 Live Stream</button>
+                            <button @click="setMode('history')" class="mode-btn" :class="{'active': currentMode === 'history'}">📅 Lịch Sử</button>
+                        </div>
+                    </div>
+                    <div v-if="currentMode === 'history'" style="display: flex; align-items: center; gap: 10px;">
+                        <input type="date" v-model="selectedDate" class="date-picker">
+                        <button @click="fetchData" class="btn-outline"> Truy Xuất</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-grid" style="margin-bottom: 20px;">
+                <div class="card stat-card alert">
+                    <h3 class="card-title" style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Cảnh Báo Vượt Ngưỡng (Hits)</h3>
+                    <div class="big-number" style="color: var(--text-main);">{{ totalAlerts }}</div>
+                </div>
+                <div class="card stat-card threshold">
+                    <h3 class="card-title" style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Ngưỡng An Toàn (H)</h3>
+                    <div class="big-number" style="color: var(--accent-yellow);">{{ currentThreshold }}</div>
+                </div>
+                <div class="card stat-card status">
+                    <h3 class="card-title" style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Trạng Thái Mạng Nội Bộ</h3>
+                    <div class="big-number" :style="{ color: isSystemAnomaly ? 'var(--accent-red)' : 'var(--accent-cyan)' }">
+                        {{ isSystemAnomaly ? 'BẤT THƯỜNG' : 'BÌNH THƯỜNG' }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card firewall-panel" :class="{'has-blocks': blockedIPs.length > 0}">
+                <h3 style="margin: 0 0 10px 0; font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 10px;" :style="{ color: blockedIPs.length > 0 ? 'var(--accent-red)' : 'var(--accent-green)' }">
+                    <span style="font-size: 1.3rem;"></span> TƯỜNG LỬA SOAR-IPS: DANH SÁCH BỊ PHONG TỎA
+                </h3>
+                
+                <div v-if="blockedIPs.length > 0" class="blocked-ip-container">
+                    <div v-for="item in blockedIPs" :key="item.ip" class="blocked-tag">
+                        <div>
+                            <span class="tag-label">Mục tiêu bị cô lập</span>
+                            <span class="tag-ip">🛑 {{ item.ip }}</span>
+                        </div>
+                        <button @click="unblockIP(item.ip)" class="btn-unblock" title="Gỡ bỏ lệnh chặn IP trên Iptables">🔓 Gỡ Chặn</button>
+                    </div>
+                </div>
+                
+                <div v-else style="margin-top: 10px; color: var(--text-muted); font-size: 0.9rem;">
+                    Hệ thống Tường lửa hiện đang trống. Không phát hiện IP có hành vi scan mạng hay DDoS vượt ngưỡng.
+                </div>
+            </div>
+
+            <div class="chart-grid">
+                <div class="card chart-full">
+                    <h3 class="card-title">Tần Suất Phân Bổ Gói Tin (TCP / UDP / ICMP)</h3>
+                    <div class="chart-container"><canvas id="trafficChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Dao Động CuSUM So Với Ngưỡng (H)</h3>
+                    <div class="chart-container"><canvas id="cusumChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Mức Độ Phân Tán IP Nguồn (H-Entropy)</h3>
+                    <div class="chart-container"><canvas id="entropyChart"></canvas></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 50px;">
+                <h3 class="card-title">Nhật Ký Đánh Giá An Ninh & Bất Thường</h3>
+                <div class="table-container" style="height: 350px; overflow-y: auto;">
+                    <table class="soc-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 15%;">Khung Thời Gian</th>
+                                <th style="width: 15%;">Top Source IP</th>
+                                <th style="width: 12%; text-align: center;">Tổng Gói tin</th>
+                                <th style="width: 10%; text-align: center;">Entropy</th>
+                                <th style="width: 13%; text-align: right;">Ngưỡng (H)</th>
+                                <th style="width: 15%; text-align: right;">CuSUM (Gn)</th>
+                                <th style="width: 20%; text-align: center;">Đánh Giá Hệ Thống</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(item, index) in tableData" :key="index">
+                                <td class="log-mono" style="color: var(--text-muted);">{{ item.tg_ketthuc }}</td>
+                                <td class="log-mono" style="font-weight: 700;">
+                                    <a :href="'packet-details.html?ip=' + encodeURIComponent(item.top_ip) + '&time=' + encodeURIComponent(item.tg_ketthuc) + '&status=' + encodeURIComponent(item.is_anomaly ? 'Bất thường' : 'Bình thường')" 
+                                       :style="{ color: item.is_anomaly ? 'var(--accent-red)' : 'var(--accent-blue)', textDecoration: 'none' }"
+                                       title="Nhấp để chuyển sang Deep Packet Inspection (DPI)">
+                                        {{ item.top_ip }} 
+                                    </a>
+                                </td>
+                                <td class="log-mono" style="text-align: center; color: var(--accent-cyan);">{{ item.tong_goi }}</td>
+                                <td class="log-mono" style="text-align: center; color: var(--accent-purple);">{{ item.entropi }}</td>
+                                <td class="log-mono" style="text-align: right; color: var(--accent-yellow);">{{ item.h_threshold }}</td>
+                                <td class="log-mono" style="text-align: right; font-weight: 700;" :style="{ color: item.is_anomaly ? 'var(--accent-red)' : 'var(--text-main)' }">{{ item.gn }}</td>
+                                <td style="text-align: center;">
+                                    <span v-if="item.is_anomaly" class="badge-status status-err"> BẤT THƯỜNG</span>
+                                    <span v-else class="badge-status status-ok"> BÌNH THƯỜNG</span>
+                                </td>
+                            </tr>
+                            <tr v-if="tableData.length === 0">
+                                <td colspan="7" style="text-align: center; padding: 50px; color: var(--text-muted);">
+                                    <div style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></div>
+                                    {{ isConnected ? 'Đang thu thập và đánh giá gói tin mạng. Vui lòng chờ vài giây...' : 'Mất kết nối API CuSUM! Vui lòng kiểm tra Server.' }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Cấu hình Chart.js chuẩn Dark Theme
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = '#334155';
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        const { createApp, ref, onMounted } = Vue;
+        createApp({
+            setup() {
+                const totalAlerts = ref(0);
+                const currentThreshold = ref(700); 
+                const tableData = ref([]);
+                const blockedIPs = ref([]); 
+                const isSystemAnomaly = ref(false);
+                const currentMode = ref('live'); 
+                const selectedDate = ref(new Date().toISOString().split('T')[0]); 
+                const isConnected = ref(true); 
+                let liveInterval = null;
+                let trafficChart, cusumChart, entropyChart;
+
+                const initCharts = () => {
+                    const commonOpts = { responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, plugins: { legend: { labels: { color: '#f8fafc' } } } };
+                    
+                    trafficChart = new Chart(document.getElementById('trafficChart'), {
+                        type: 'bar',
+                        data: { labels: [], datasets: [
+                            { label: 'TCP', backgroundColor: '#3b82f6', data: [] }, // Blue
+                            { label: 'UDP', backgroundColor: '#a855f7', data: [] }, // Purple
+                            { label: 'ICMP', backgroundColor: '#f59e0b', data: [] } // Yellow
+                        ]},
+                        options: { ...commonOpts, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true } } }
+                    });
+                    
+                    cusumChart = new Chart(document.getElementById('cusumChart'), {
+                        type: 'line',
+                        data: { labels: [], datasets: [
+                            { label: 'CuSUM (Gn)', borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.1)', fill: true, tension: 0.3, pointRadius: 2, data: [] },
+                            { label: 'Ngưỡng (H)', borderColor: '#ef4444', borderDash: [5, 5], pointRadius: 0, data: [] }
+                        ]}, options: { ...commonOpts, scales: { x: { grid: { display: false } } } }
+                    });
+                    
+                    entropyChart = new Chart(document.getElementById('entropyChart'), {
+                        type: 'line',
+                        data: { labels: [], datasets: [
+                            { label: 'Entropy (H)', borderColor: '#a855f7', backgroundColor: 'rgba(168, 85, 247, 0.1)', fill: true, tension: 0.3, pointRadius: 2, data: [] }
+                        ]}, options: { ...commonOpts, scales: { x: { grid: { display: false } } } }
+                    });
+                };
+
+                const updateCharts = (chartData) => {
+                    const labels = chartData.map(i => i.tg_ketthuc.split(' ')[1]);
+                    
+                    trafficChart.data.labels = labels;
+                    trafficChart.data.datasets[0].data = chartData.map(i => i.tcp);
+                    trafficChart.data.datasets[1].data = chartData.map(i => i.udp);
+                    trafficChart.data.datasets[2].data = chartData.map(i => i.icmp);
+                    trafficChart.update();
+
+                    cusumChart.data.labels = labels;
+                    cusumChart.data.datasets[0].data = chartData.map(i => i.gn);
+                    cusumChart.data.datasets[1].data = chartData.map(i => i.h_threshold);
+                    cusumChart.update();
+
+                    entropyChart.data.labels = labels;
+                    entropyChart.data.datasets[0].data = chartData.map(i => i.entropi);
+                    entropyChart.update();
+                };
+
+                const fetchBlockedIPs = async () => {
+                    try {
+                        const apiHost = window.location.hostname;
+                        const res = await fetch(`http://${apiHost}:5005/api/blocked_ips`, { cache: 'no-store' });
+                        if(res.ok) blockedIPs.value = await res.json();
+                    } catch(e) { console.log("Không thể kết nối Firewall API nội bộ:", e.message); }
+                };
+
+                const unblockIP = async (ip) => {
+                    if(!confirm(` XÁC NHẬN:\nBạn muốn GỠ LỆNH CHẶN đối với IP: ${ip} trên Tường lửa?`)) return;
+                    try {
+                        const apiHost = window.location.hostname;
+                        const res = await fetch(`http://${apiHost}:5005/api/unblock/${ip}`, { method: 'POST' });
+                        if(res.ok) {
+                            blockedIPs.value = blockedIPs.value.filter(item => item.ip !== ip);
+                            alert(` Đã GỠ CHẶN thành công IP: ${ip}`);
+                        }
+                    } catch(e) { alert(` Lỗi giao tiếp Tường lửa: ${e.message}`); }
+                };
+
+                const fetchData = async () => {
+                    try {
+                        const apiHost = window.location.hostname;
+                        let apiUrl = `http://${apiHost}:5050/backend_api/routes/api.php?route=get_anomaly_data`;
+                        if (currentMode.value === 'history') apiUrl += `&date=${selectedDate.value}`;
+                        
+                        const res = await fetch(apiUrl, {
+                            method: 'GET', cache: 'no-store', mode: 'cors', headers: { 'Accept': 'application/json' }
+                        });
+
+                        isConnected.value = true; 
+                        const json = await res.json();
+                        
+                        if (res.ok && json.status === 'success') {
+                            const rawData = json.data || []; 
+                            if (rawData.length > 0) {
+                                currentThreshold.value = rawData[0].h_threshold; 
+                                const dataForChart = currentMode.value === 'history' ? rawData : rawData.slice(-40);
+                                tableData.value = [...dataForChart].reverse();
+                                isSystemAnomaly.value = dataForChart.some(item => item.is_anomaly);
+                                totalAlerts.value = dataForChart.filter(item => item.is_anomaly).length;
+                                updateCharts(dataForChart);
+                            } else {
+                                tableData.value = []; updateCharts([]);
+                                totalAlerts.value = 0; isSystemAnomaly.value = false;
+                            }
+                        }
+                    } catch (e) { isConnected.value = false; }
+                };
+
+                const setMode = (mode) => {
+                    currentMode.value = mode;
+                    if (mode === 'live') {
+                        selectedDate.value = new Date().toISOString().split('T')[0];
+                        fetchData(); fetchBlockedIPs();
+                        clearInterval(liveInterval);
+                        liveInterval = setInterval(() => { fetchData(); fetchBlockedIPs(); }, 5000);
+                    } else {
+                        clearInterval(liveInterval);
+                        fetchData(); fetchBlockedIPs();
+                    }
+                };
+
+                onMounted(() => { initCharts(); setMode('live'); });
+                
+                return { 
+                    totalAlerts, currentThreshold, tableData, isSystemAnomaly, 
+                    currentMode, selectedDate, setMode, fetchData, isConnected,
+                    blockedIPs, unblockIP 
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

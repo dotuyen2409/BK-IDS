@@ -1,0 +1,8 @@
+#/home/bk_ids/bk-ids/core_engine/local.rules
+
+# ==================================================================
+# BK-IDS SOC: TỆP LUẬT SNORT 3 (LOCAL RULES)
+# Tự động đồng bộ từ Database - Không chỉnh sửa thủ công
+# ==================================================================
+
+drop tcp any any -> any any (msg:"[DROP] SQL Injection Detected"; content:"UNION", nocase; sid:1000001; rev:8;)

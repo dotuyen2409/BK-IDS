@@ -1,0 +1,100 @@
+04/23-12:19:00.225808 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 192.168.142.129:33440 -> 172.18.0.5:80
+04/23-12:19:00.437231 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 192.168.142.129:33440 -> 172.18.0.5:80
+04/23-12:19:00.641986 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 192.168.142.129:33440 -> 172.18.0.5:80
+04/23-12:19:01.061847 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 192.168.142.129:33440 -> 172.18.0.5:80
+04/23-12:19:01.896957 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 192.168.142.129:33440 -> 172.18.0.5:80
+04/23-12:19:03.558856 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 192.168.142.129:33440 -> 172.18.0.5:80
+04/23-12:19:06.879778 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 192.168.142.129:33440 -> 172.18.0.5:80
+04/23-12:19:13.448124 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 192.168.142.129:33440 -> 172.18.0.5:80
+04/23-12:19:18.303670 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:18.303670 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:18.303670 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:18.320260 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:18.320260 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:18.320260 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:18.584472 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:18.584472 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:18.584472 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:19.010540 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:19.010540 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:19.010540 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:19.868759 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:19.868759 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:19.868759 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:21.591857 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:21.591857 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:21.591857 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:24.990700 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:24.990700 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:24.990700 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:26.541224 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 192.168.142.129:33440 -> 172.18.0.5:80
+04/23-12:19:32.021469 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:32.021469 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:32.021469 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:45.848011 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:45.848011 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:45.848011 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:19:53.134866 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 192.168.142.129:33440 -> 172.18.0.5:80
+04/23-12:20:12.993186 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:20:12.993186 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/23-12:20:12.993186 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:61052
+04/24-08:10:31.185588 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:31.185588 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:31.185588 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:31.201341 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:31.201341 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:31.201341 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:31.452212 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:31.452212 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:31.452212 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:31.875142 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:31.875142 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:31.875142 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:32.769234 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:32.769234 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:32.769234 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:34.142077 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:34.142077 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:34.142077 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:34.161072 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:34.161072 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:34.161072 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:34.408823 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:34.408823 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:34.408823 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:34.501763 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:34.501763 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:34.501763 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:34.833091 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:34.833091 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:34.833091 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:35.706110 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:35.706110 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:35.706110 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:37.437845 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:37.437845 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:37.437845 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:37.893818 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:37.893818 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:37.893818 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:40.828564 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:40.828564 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:40.828564 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:44.930353 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:44.930353 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:44.930353 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:48.005109 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:48.005109 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:48.005109 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:10:58.758856 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:58.758856 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:10:58.758856 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:11:01.817879 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:11:01.817879 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:11:01.817879 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:11:25.884539 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:11:25.884539 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:11:25.884539 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:55028
+04/24-08:11:28.963147 [drop] [**] [1:1000003:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:11:28.963147 [drop] [**] [1:1000001:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338
+04/24-08:11:28.963147 [drop] [**] [1:1000002:5] "[DROP] ET-PRO ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass" [**] [Priority: 0] {TCP} 172.18.0.2:5000 -> 192.168.142.1:64338

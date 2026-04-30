@@ -1,0 +1,1 @@
+/usr/local/etc/snort/snort_defaults.lua

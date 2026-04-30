@@ -1,0 +1,13 @@
+# Thông tin nhạy cảm
+.env
+__pycache__/
+*.pyc
+
+# Dữ liệu động của hệ thống
+bans_state.json
+core_engine/rules_db.json
+web_dashboard/backend_api/logs/
+
+# File lớn hoặc file tạm
+*.log
+*.pcap

@@ -1,0 +1,20 @@
+# /home/bk_ids/bk-ids/Dockerfile.api
+
+FROM python:3.10-slim
+
+# Bổ sung các công cụ mạng lõi và procps (chứa lệnh pkill)
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    iputils-ping \
+    net-tools \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir flask flask-cors mysql-connector-python requests psutil python-dotenv pymysql
+
+EXPOSE 5000
+
+CMD ["python3", "api_server.py"]

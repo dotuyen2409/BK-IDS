@@ -1,0 +1,418 @@
+<!-- /home/bk_ids/bk-ids/web_dashboard/frontend/pages/rules-config.html -->
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Thiết Lập Luật Snort 3 - Bk-IDS SOC Enterprise</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        :root {
+            --bg-base: #020617;        
+            --bg-surface: #0f172a;     
+            --bg-elevated: #1e293b;    
+            --border-subtle: #334155;  
+            --text-main: #f8fafc;      
+            --text-muted: #94a3b8;     
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --accent-green: #10b981;
+            --code-text: #a78bfa;      
+        }
+
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-base); color: var(--text-main); margin: 0; padding: 0; overflow: hidden; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-base); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        .soc-layout { display: flex; height: 100vh; width: 100vw; }
+        .sidebar { width: 250px; background: var(--bg-surface); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; padding: 20px 0; }
+        .brand { text-align: center; padding-bottom: 20px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 15px; }
+        .nav-link { display: block; padding: 10px 20px; color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: 0.2s; }
+        .nav-link:hover { color: var(--text-main); background: rgba(255,255,255,0.02); }
+        .nav-link.active { color: var(--text-main); background: rgba(59, 130, 246, 0.1); border-left: 3px solid var(--accent-blue); font-weight: 600; }
+        .card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5); margin-bottom: 24px; }
+        .form-label { display: block; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;}
+        .config-input { background: var(--bg-base); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 10px 14px; border-radius: 6px; width: 100%; font-family: 'Inter', sans-serif; font-size: 0.9rem; outline: none; box-sizing: border-box; transition: 0.2s; }
+        .config-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+        .btn { padding: 10px 18px; border: none; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; color: #fff; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .btn-outline { background: transparent; border: 1px solid var(--border-subtle); color: var(--text-main); }
+        .btn-outline:hover:not(:disabled) { background: var(--bg-elevated); }
+        .btn-primary { background: var(--accent-blue); }
+        .btn-danger { background: var(--accent-red); }
+        .btn-warning { background: var(--accent-yellow); color: #000; }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .search-wrapper { position: relative; width: 350px; }
+        .search-input { width: 100%; background: var(--bg-base); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 10px 14px 10px 36px; border-radius: 6px; font-size: 0.9rem; }
+        .search-input:focus { border-color: var(--accent-blue); outline: none; }
+        .search-wrapper::before { content: ""; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 0.9rem; opacity: 0.5; }
+        .table-container { border: 1px solid var(--border-subtle); border-radius: 8px; overflow: hidden; background: var(--bg-base); max-height: calc(100vh - 400px); overflow-y: auto; }
+        .soc-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; table-layout: fixed; }
+        .soc-table th { padding: 12px 16px; color: var(--text-muted); font-weight: 600; background: var(--bg-elevated); text-transform: uppercase; font-size: 0.75rem; border-bottom: 1px solid var(--border-subtle); position: sticky; top: 0; z-index: 10; letter-spacing: 0.5px; }
+        .soc-table td { padding: 14px 16px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
+        .soc-table tr:hover td { background: rgba(255,255,255,0.02); }
+        .rule-code-block { background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--code-text); word-wrap: break-word; word-break: break-all; white-space: normal; max-height: 100px; overflow-y: auto; line-height: 1.5; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.7rem; letter-spacing: 0.5px; display: inline-block;}
+        .badge-proto { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.2); }
+        .badge-port { background: rgba(245, 158, 11, 0.1); color: #fbbf24; font-family: 'JetBrains Mono', monospace; border: 1px solid rgba(245, 158, 11, 0.2); }
+        .badge-drop { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); }
+        .badge-alert { background: rgba(245, 158, 11, 0.1); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); }
+        .badge-local { background: rgba(167, 139, 250, 0.1); color: #a78bfa; border: 1px solid rgba(167, 139, 250, 0.2); margin-top: 4px;}
+        .pagination { display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--border-subtle); margin-top: 16px;}
+        .page-info { color: var(--text-muted); font-size: 0.85rem; }
+        .page-controls { display: flex; gap: 6px; }
+        .page-btn { background: var(--bg-base); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; transition: 0.2s; }
+        .page-btn:hover:not(:disabled) { background: var(--bg-elevated); }
+        .page-btn.active { background: var(--accent-blue); border-color: var(--accent-blue); font-weight: bold; }
+        .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 50; }
+        .modal-content { background: var(--bg-surface); border: 1px solid var(--border-subtle); width: 800px; max-width: 90vw; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+        .modal-header { padding: 16px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; background: var(--bg-elevated);}
+        .modal-header h3 { margin: 0; font-size: 1rem; color: var(--text-main); font-family: 'JetBrains Mono', monospace;}
+        .terminal-box { background: #000; padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #10b981; max-height: 400px; overflow-y: auto; line-height: 1.6;}
+    </style>
+</head>
+<body>
+    <div id="app" class="soc-layout">
+        <aside class="sidebar">
+            <div class="brand">
+                <span style="font-size: 1.2rem; font-weight: 700; color: #38bdf8; letter-spacing: 1px;"> Bk-IDS SOC</span>
+            </div>
+            <a href="index.html" class="nav-link">⌂ Tổng quan</a>
+            <div style="margin-top: 20px;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Hệ thống Bắt gói tin</div>
+                <a href="capture-config.html" class="nav-link">⚙ Cấu hình & Tiền xử lý</a>
+            </div>
+            <div style="margin-top: 20px;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện Bất thường</div>
+                <a href="index_sensor.html" class="nav-link">Theo Dõi Cảm Biến</a>
+                <a href="anomaly-config.html" class="nav-link">Cấu hình Ngưỡng</a>
+            </div>
+            <div style="margin-top: 20px;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện Lạm dụng</div>
+                <a href="index_ips.html" class="nav-link">Theo Dõi IPS</a>
+                <a href="rules-config.html" class="nav-link active">Cài đặt Luật (Snort 3)</a>
+            </div>
+        </aside>
+
+        <main style="flex: 1; padding: 30px; overflow-y: auto; box-sizing: border-box;">
+            <div style="margin-bottom: 24px;">
+                <h2 style="margin: 0 0 8px 0; font-size: 1.5rem; font-weight: 600;">Cơ Sở Tri Thức (Signature-based IDS/IPS)</h2>
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem;">Quản lý các luật phòng thủ do người dùng tự định nghĩa (Local Rules).</p>
+            </div>
+
+            <div class="card">
+                <div style="display: grid; grid-template-columns: 1.5fr 1fr 2.5fr; gap: 20px;">
+                    <div>
+                        <label class="form-label">Tên Cảnh Báo (Tên Mã Độc)</label>
+                        <input type="text" v-model="newRule.name" class="config-input" placeholder="VD: Khai thac SQL Injection">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label class="form-label">Protocol</label>
+                            <select v-model="newRule.protocol" class="config-input">
+                                <option value="tcp">TCP</option>
+                                <option value="udp">UDP</option>
+                                <option value="icmp">ICMP</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">Port</label>
+                            <input type="text" v-model="newRule.dst_port" class="config-input" placeholder="VD: 80, 443">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label">Mã Hex / Raw Rule (Pattern)</label>
+                        <input type="text" v-model="newRule.pattern" class="config-input" placeholder="Nhập chuỗi regex hoặc nội dung luật thô...">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 20px;">
+                    <button @click="addRule('ALERT')" class="btn btn-warning"> Ghi nhận Cảnh báo (IDS)</button>
+                    <button @click="addRule('DROP')" class="btn btn-danger"> Tiêu diệt Kết nối (IPS)</button>
+                </div>
+            </div>
+
+            <div class="card" style="display: flex; flex-direction: column; flex: 1;">
+                <div class="toolbar">
+                    <div class="search-wrapper">
+                        <input type="text" v-model="searchQuery" class="search-input" placeholder="Tìm kiếm theo Tên, Port hoặc Dấu hiệu...">
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <span style="color: var(--text-muted); font-size: 0.85rem; padding-right: 15px; border-right: 1px solid var(--border-subtle);">
+                            Tổng: <strong style="color: #fff;">{{ rules.length }}</strong> luật
+                        </span>
+                        <button @click="openFirewallModal" class="btn btn-outline" style="color: #f87171; border-color: rgba(239, 68, 68, 0.3);">
+                            🛑 Xem Tường Lửa
+                        </button>
+                        <button @click="syncRules(false)" :disabled="isSaving" class="btn btn-primary">
+                            {{ isSaving ? ' Đang biên dịch...' : ' Biên dịch & Nạp Snort' }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="soc-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 25%;">Tên Cảnh Báo</th>
+                                <th style="width: 12%;">Mục Tiêu</th>
+                                <th style="width: 48%;">Dấu Hiệu Nguyên Bản (Raw Rule)</th>
+                                <th style="width: 10%;">Phản Ứng</th>
+                                <th style="width: 5%; text-align: center;">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(rule, idx) in paginatedRules" :key="idx">
+                                <td style="font-weight: 500;">
+                                    {{ rule.name }}<br>
+                                    <span v-if="rule.is_local" class="badge badge-local">Local Rule</span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-proto">{{ rule.protocol ? rule.protocol.toUpperCase() : 'TCP' }}</span>
+                                    <span style="color: var(--text-muted); margin: 0 4px;">:</span>
+                                    <span class="badge badge-port">{{ rule.dst_port || 'any' }}</span>
+                                </td>
+                                <td>
+                                    <div class="rule-code-block">{{ rule.pattern }}</div>
+                                </td>
+                                <td>
+                                    <span v-if="rule.action === 'DROP'" class="badge badge-drop">DROP</span>
+                                    <span v-else class="badge badge-alert">ALERT</span>
+                                </td>
+                                <td style="text-align: center;">
+                                    <button v-if="rule.is_local" @click="removeRule(rule)" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; transition: 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--text-muted)'">×</button>
+                                    <span v-else title="Luật Hệ thống/Threat Intel (Không thể xóa)" style="font-size: 1rem; color: var(--border-subtle); cursor: not-allowed;">🔒</span>
+                                </td>
+                            </tr>
+                            <tr v-if="filteredRules.length === 0">
+                                <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted); font-style: italic;">
+                                    Không tìm thấy dữ liệu bộ luật.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pagination" v-show="rules.length > 0">
+                    <div class="page-info">
+                        Hiển thị <b>{{ Math.min((currentPage - 1) * itemsPerPage + 1, filteredRules.length) }}</b> - <b>{{ Math.min(currentPage * itemsPerPage, filteredRules.length) }}</b> của <b>{{ filteredRules.length }}</b> kết quả
+                    </div>
+                    <div class="page-controls">
+                        <button class="page-btn" @click="currentPage--" :disabled="currentPage === 1">«</button>
+                        <button class="page-btn" v-for="page in visiblePages" :key="page" @click="currentPage = page" :class="{ active: currentPage === page }">{{ page }}</button>
+                        <button class="page-btn" @click="currentPage++" :disabled="currentPage === totalPages || totalPages === 0">»</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div class="modal-overlay" v-if="showFirewallModal" @click.self="showFirewallModal = false">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>root@bkids-firewall:~# iptables -L INPUT -n</h3>
+                    <button style="background: transparent; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;" @click="showFirewallModal = false">×</button>
+                </div>
+                <div class="terminal-box">
+                    <div v-if="isLoadingFirewall">Đang kết nối Iptables API...</div>
+                    <div v-else-if="bannedIps.length === 0">
+                        Chain INPUT (policy ACCEPT)<br>
+                        target     prot opt source               destination<br><br>
+                        [+] Không có IP nào đang bị ngăn chặn.
+                    </div>
+                    <div v-else>
+                        Chain INPUT (policy ACCEPT)<br>
+                        target     prot opt source               destination<br>
+                        <div v-for="(ban, idx) in bannedIps" :key="idx" style="margin-top: 8px;">
+                            <span style="color: #ef4444;">DROP</span>       all  --  <span style="color: #f8fafc; font-weight: bold;">{{ ban.ip_src }}</span>       0.0.0.0/0 <br>
+                            <span style="color: #475569;">/* Bị khóa bởi Lõi IPS: {{ ban.sig_name }} */</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, watch, onMounted } = Vue;
+        
+        createApp({
+            setup() {
+                const rules = ref([]);
+                const newRule = ref({ name: '', protocol: 'tcp', dst_port: '', pattern: '' });
+                const isSaving = ref(false);
+
+                const searchQuery = ref('');
+                const currentPage = ref(1);
+                const itemsPerPage = ref(10); 
+                const showAllRules = ref(false); 
+
+                const showFirewallModal = ref(false);
+                const bannedIps = ref([]);
+                const isLoadingFirewall = ref(false);
+
+                const filteredRules = computed(() => {
+                    if (!searchQuery.value) return rules.value;
+                    const query = searchQuery.value.toLowerCase();
+                    return rules.value.filter(r => 
+                        r.name.toLowerCase().includes(query) || 
+                        r.pattern.toLowerCase().includes(query) ||
+                        (r.dst_port && r.dst_port.toLowerCase().includes(query))
+                    );
+                });
+
+                const totalPages = computed(() => {
+                    return Math.ceil(filteredRules.value.length / itemsPerPage.value) || 1;
+                });
+
+                const paginatedRules = computed(() => {
+                    if (showAllRules.value) return filteredRules.value; 
+                    const start = (currentPage.value - 1) * itemsPerPage.value;
+                    return filteredRules.value.slice(start, start + itemsPerPage.value);
+                });
+
+                const visiblePages = computed(() => {
+                    let pages = [];
+                    let total = totalPages.value;
+                    let current = currentPage.value;
+                    
+                    let startPage = Math.max(1, current - 2);
+                    let endPage = Math.min(total, current + 2);
+                    
+                    if (current <= 2) endPage = Math.min(total, 5);
+                    if (current >= total - 1) startPage = Math.max(1, total - 4);
+                    
+                    for (let i = startPage; i <= endPage; i++) pages.push(i);
+                    return pages;
+                });
+
+                watch(searchQuery, () => { currentPage.value = 1; });
+
+                const fetchRules = async () => {
+                    try {
+                        const apiHost = window.location.hostname;
+                        const timestamp = new Date().getTime();
+                        const res = await fetch(`http://${apiHost}:5050/backend_api/routes/api.php?route=get_rules&t=${timestamp}`, {
+                            method: 'GET', cache: 'no-store', mode: 'cors'
+                        });
+                        const json = await res.json();
+                        if (res.ok && json.status === 'success') {
+                            // 🎯 BỎ LỆNH .reverse() GÂY MẤT LUẬT LÚC F5
+                            const rawRules = json.data || []; 
+                            rules.value = rawRules.map(r => {
+                                r.is_local = r.is_local === true || r.is_local === "true" || r.is_local === 1;
+                                return r;
+                            });
+                        }
+                    } catch (e) { 
+                        console.error("Lỗi lấy dữ liệu luật:", e); 
+                    }
+                };
+
+                const openFirewallModal = async () => {
+                    showFirewallModal.value = true;
+                    isLoadingFirewall.value = true;
+                    try {
+                        const apiHost = window.location.hostname;
+                        const timestamp = new Date().getTime();
+                        const res = await fetch(`http://${apiHost}:5050/backend_api/routes/api.php?route=get_banned_ips&t=${timestamp}`, {
+                            method: 'GET', cache: 'no-store', mode: 'cors'
+                        });
+                        const json = await res.json();
+                        if (res.ok && json.status === 'success') {
+                            bannedIps.value = json.data || [];
+                        } else {
+                            alert("Lỗi tải trạng thái Iptables: " + json.message);
+                        }
+                    } catch (e) { 
+                        console.error("Lỗi giao tiếp Tường lửa:", e); 
+                    }
+                    isLoadingFirewall.value = false;
+                };
+
+                const addRule = async (action) => {
+                    if (!newRule.value.name.trim() || !newRule.value.pattern.trim()) {
+                        alert(" Vui lòng nhập đầy đủ Tên và Chuỗi mã độc nhận diện!");
+                        return;
+                    }
+                    rules.value.unshift({ 
+                        name: newRule.value.name.trim(), 
+                        protocol: newRule.value.protocol,
+                        dst_port: newRule.value.dst_port.trim() || 'any',
+                        pattern: newRule.value.pattern.trim(), 
+                        action: action,
+                        is_local: true 
+                    });
+                    newRule.value = { name: '', protocol: 'tcp', dst_port: '', pattern: '' };
+                    currentPage.value = 1;
+                    
+                    await syncRules(true);
+                };
+
+                const removeRule = async (ruleToDelete) => { 
+                    if(confirm(`Bạn có chắc chắn muốn xóa luật: ${ruleToDelete.name}?`)) {
+                        const index = rules.value.findIndex(r => r === ruleToDelete);
+                        if(index !== -1) {
+                            rules.value.splice(index, 1);
+                            if (!showAllRules.value && paginatedRules.value.length === 0 && currentPage.value > 1) {
+                                currentPage.value--;
+                            }
+                            await syncRules(true); 
+                        }
+                    }
+                };
+
+                const syncRules = async (silent = false) => {
+                    const isSilent = silent === true; 
+
+                    // 🎯 ĐẢO NGƯỢC (REVERSE) KHI LƯU XUỐNG ĐỂ DB ĐÁNH SỐ ID TỪ CŨ ĐẾN MỚI
+                    const localRulesToSave = rules.value.filter(r => r.is_local).reverse().map(r => ({
+                        name: r.name,
+                        protocol: r.protocol,
+                        dst_port: r.dst_port,
+                        pattern: r.pattern,
+                        action: r.action
+                    }));
+
+                    if(localRulesToSave.length === 0 && !isSilent && !confirm("Danh sách luật nội bộ đang trống. Các luật cũ sẽ bị xóa. Chắc chắn tiếp tục?")) return;
+                    
+                    isSaving.value = true;
+                    try {
+                        const apiHost = window.location.hostname;
+                        const res = await fetch(`http://${apiHost}:5050/backend_api/routes/api.php?route=save_rules`, {
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ rules: localRulesToSave }) 
+                        });
+                        
+                        const json = await res.json();
+                        if (res.ok && json.status === 'success') {
+                            if (!isSilent) alert(" " + json.message);
+                            await fetchRules();
+                        }
+                        else {
+                            alert(" Lỗi từ máy chủ: " + json.message);
+                        }
+                    } catch (e) { 
+                        alert(" Mất kết nối tới Lõi API (Cổng 5050). Vui lòng kiểm tra Docker!"); 
+                    }
+                    isSaving.value = false;
+                };
+
+                onMounted(fetchRules);
+                
+                return { 
+                    rules, newRule, isSaving, 
+                    searchQuery, currentPage, totalPages, paginatedRules, filteredRules, visiblePages, itemsPerPage,
+                    showAllRules, showFirewallModal, bannedIps, isLoadingFirewall,
+                    openFirewallModal, addRule, removeRule, syncRules
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
