@@ -4,7 +4,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>INLINE IPS - Bk-IDS SOC Enterprise</title>
+    <title>INLINE IPS - Bk-IDS Enterprise</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -131,7 +131,7 @@
     <div id="app">
         <aside class="sidebar">
             <div class="brand">
-                <span style="font-size: 1.2rem; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px;">🛡️ Bk-IDS SOC</span>
+                <span style="font-size: 1.2rem; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px;"> Bk-IDS </span>
             </div>
             <a href="index.html" class="nav-link">⌂ Tổng quan (Dashboard)</a>
             <div style="margin-top: 20px;">
@@ -145,10 +145,11 @@
             </div>
             <div style="margin-top: 20px;">
                 <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện Lạm dụng</div>
-                <a href="index_ips.html" class="nav-link active">Theo Dõi IPS</a>
+                <a href="index_ips.html" class="nav-link">Theo Dõi IPS</a>
                 <a href="alerts-explorer.html" class="nav-link"> Truy vấn Cảnh báo</a>
                 <a href="rules-config.html" class="nav-link">Cài đặt Luật (Snort 3)</a>
             </div>
+            <a href="packet-list.html" class="nav-link">Danh sách các gói tin</a>
         </aside>
 
         <main class="main-content">
@@ -175,7 +176,7 @@
                 <div class="card stat-card firewall">
                     <h3 class="card-title" style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">Trạng Thái Firewall</h3>
                     <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
-                        <span style="font-size: 2rem;">🛡️</span>
+                        <span style="font-size: 2rem;"></span>
                         <div>
                             <div style="color: var(--accent-green); font-weight: 700; font-size: 1.2rem; letter-spacing: 0.5px;">ACTIVE MODE</div>
                             <div style="color: var(--text-muted); font-size: 0.8rem;">Sẵn sàng cách ly IP độc hại</div>
@@ -252,7 +253,7 @@
                             </tr>
                             <tr v-if="tableData.length === 0">
                                 <td colspan="6" style="text-align: center; padding: 60px; color: var(--text-muted);">
-                                    <div style="font-size: 2.5rem; margin-bottom: 15px; opacity: 0.5;">🛡️</div>
+                                    <div style="font-size: 2.5rem; margin-bottom: 15px; opacity: 0.5;"></div>
                                     <div style="font-size: 0.95rem;">{{ isConnected ? 'Hệ thống an toàn. Tường lửa và Snort chưa ghi nhận mẫu xâm nhập nào.' : 'Mất kết nối với Lõi API, đang thử kết nối lại...' }}</div>
                                 </td>
                             </tr>

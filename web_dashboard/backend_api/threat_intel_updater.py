@@ -20,9 +20,9 @@ def fetch_and_merge_et_rules():
     except Exception as e:
         logger.info(" [THREAT INTEL] Dùng Fallback (Offline)...")
         raw_rules = """
-        alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản"; content:"<script>alert(", nocase; sid:2000001; rev:1;)
-        alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass"; content:"' OR 1=1 --", nocase; sid:2000004; rev:1;)
-        alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE"; content:"${jndi:ldap://", nocase; sid:2000005; rev:1;)
+        alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS Dấu hiệu XSS Reflected cơ bản"; content:"<script>alert("; nocase; sid:2000001; rev:1;)
+        alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS Tấn công SQLi Boolean Based Bypass"; content:"' OR 1=1 --"; nocase; sid:2000004; rev:1;)
+        alert tcp any any -> any any (msg:"ET WEB_SPECIFIC_APPS Khai thác Lỗ hổng Log4j JNDI Injection RCE"; content:"${jndi:ldap://"; nocase; sid:2000005; rev:1;)
         """
         
     pattern = re.compile(r'alert\s+(tcp|udp).*?msg\s*:\s*"([^"]+)".*?content\s*:\s*"([^"]+)"', re.IGNORECASE)

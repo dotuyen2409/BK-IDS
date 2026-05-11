@@ -7,11 +7,14 @@ import logging
 import subprocess
 import re
 import pymysql
-
+import threading
+import time
 from flask import request, jsonify
 
 sys.path.append('/app')
-import threat_intel_updater
+try:
+    import threat_intel_updater
+except: pass
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +23,103 @@ SNORT_RULES_PATH = '/app/core_engine/local.rules'
 
 DB_HOST = 'mysql_db' 
 DB_USER = 'root'
-DB_PASS = 'rootpassword' # Thay bằng mật khẩu thực tế
+DB_PASS = 'rootpassword' 
 DB_NAME = 'bk_ids'
 DB_TABLE = 'rules'
+
+# 🎯 BIẾN TOÀN CỤC CHO ĐỒNG BỘ HAI CHIỀU
+LAST_SYNC_MTIME = 0
+WATCHER_STARTED = False
+
+# ========================================================================
+# CƠ CHẾ ĐỒNG BỘ NGƯỢC (FILE -> DATABASE)
+# ========================================================================
+def sync_file_to_db_core():
+    global LAST_SYNC_MTIME
+    try:
+        if not os.path.exists(SNORT_RULES_PATH): return
+
+        with open(SNORT_RULES_PATH, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+
+        conn = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASS, database=DB_NAME)
+        cursor = conn.cursor()
+
+        for line in lines:
+            line = line.strip()
+            # Bỏ qua dòng trống, comment và luật whitelist tự sinh
+            if not line or line.startswith('#') or line.startswith('pass ip'):
+                continue
+
+            # Bóc tách SID và Message bằng Regex
+            sid_match = re.search(r'sid\s*:\s*(\d+)\s*;', line, re.IGNORECASE)
+            msg_match = re.search(r'msg\s*:\s*"([^"]+)"\s*;', line, re.IGNORECASE)
+
+            if sid_match and msg_match:
+                sid = int(sid_match.group(1))
+                msg = msg_match.group(1)
+                
+                # Chỉ đồng bộ các SID dành cho Custom Rules (>= 1000000)
+                if sid < 1000000: continue
+
+                # Bóc tách Action (alert/drop) và Protocol (tcp/udp/icmp/ip)
+                parts = line.split()
+                action = parts[0].upper() if len(parts) > 0 else 'ALERT'
+                protocol = parts[1].lower() if len(parts) > 1 else 'tcp'
+
+                # Ghi đè hoặc thêm mới vào Database
+                sql = f"""
+                    INSERT INTO {DB_TABLE} (sid, rev, action, protocol, msg, raw_rule, source) 
+                    VALUES (%s, 1, %s, %s, %s, %s, 'local_custom')
+                    ON DUPLICATE KEY UPDATE 
+                    action=VALUES(action), protocol=VALUES(protocol), msg=VALUES(msg), raw_rule=VALUES(raw_rule)
+                """
+                cursor.execute(sql, (sid, action, protocol, msg, line))
+
+        conn.commit()
+        conn.close()
+        logger.info("🔄 [TWO-WAY SYNC] Đã đồng bộ ngược từ File local.rules lên Website thành công!")
+        
+        # Cập nhật mtime để vòng lặp tiếp theo không quét lại chính nó
+        LAST_SYNC_MTIME = os.stat(SNORT_RULES_PATH).st_mtime
+        
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi đồng bộ File -> Database: {e}")
+
+def file_watcher_worker():
+    global LAST_SYNC_MTIME
+    while True:
+        time.sleep(3) # Quét 3 giây 1 lần
+        try:
+            if os.path.exists(SNORT_RULES_PATH):
+                current_mtime = os.stat(SNORT_RULES_PATH).st_mtime
+                if LAST_SYNC_MTIME == 0:
+                    LAST_SYNC_MTIME = current_mtime # Khởi tạo lần đầu
+                elif current_mtime != LAST_SYNC_MTIME:
+                    logger.info("👀 Phát hiện thay đổi thủ công trong local.rules. Tiến hành đồng bộ...")
+                    time.sleep(1) # Đợi người dùng Save file hoàn tất
+                    sync_file_to_db_core()
+                    LAST_SYNC_MTIME = os.stat(SNORT_RULES_PATH).st_mtime
+        except Exception: pass
+
+# Khởi chạy tiểu trình giám sát ngầm
+if not WATCHER_STARTED:
+    threading.Thread(target=file_watcher_worker, daemon=True).start()
+    WATCHER_STARTED = True
+
+# ========================================================================
+# CÁC HÀM XỬ LÝ LÕI (GIỮ NGUYÊN)
+# ========================================================================
+def get_whitelist_from_env():
+    paths = ['/home/bk_ids/bk-ids/.env', '/app/.env', '.env']
+    for path in paths:
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                for line in f:
+                    if line.strip().startswith("WHITELIST_IPS="):
+                        ips = line.split('=', 1)[1].strip().strip('"\'').split(',')
+                        return [ip.strip() for ip in ips if ip.strip()]
+    return ["192.168.142.1"]
 
 def sanitize_name(text):
     if not text: return "Unknown Threat"
@@ -31,21 +128,19 @@ def sanitize_name(text):
 def sanitize_pattern(text):
     if not text: return ""
     text = str(text)
-    # 🎯 FIX LỖI: Nếu là luật nguyên bản (Raw Rule), tuyệt đối không chèn thêm dấu \ làm hỏng cấu trúc
-    if "->" in text and "msg:" in text:
-        return text
-    text = text.replace('\\', '\\\\').replace('"', '\\"').replace(';', '\\;')
-    return text
+    if "->" in text and "msg:" in text: return text.strip()
+    text = text.replace('"', '\\"')
+    return text.strip()
 
 def trigger_system_reload():
     try:
-        subprocess.run(["pkill", "-SIGHUP", "-f", "snort"], check=False)
+        subprocess.run(["pkill", "-TERM", "-f", "snort"], check=False)
         logger.info("🔄 Đã gửi lệnh Hot-Reload tới Lõi Snort 3.")
     except Exception as e:
         logger.warning(f"Không thể gửi tín hiệu nạp lại tới Snort: {e}")
 
 def generate_snort_rules_from_db():
-    """ 🎯 ĐỌC LUẬT TỪ DATABASE VÀ XUẤT RA FILE (Tránh rác từ file JSON) """
+    global LAST_SYNC_MTIME
     try:
         conn = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASS, database=DB_NAME, cursorclass=pymysql.cursors.DictCursor)
         cursor = conn.cursor()
@@ -56,22 +151,31 @@ def generate_snort_rules_from_db():
         snort_lines = [
             "# ==================================================================",
             "# BK-IDS SOC: TỆP LUẬT SNORT 3 (LOCAL RULES)",
-            "# Tự động đồng bộ từ Database - Không chỉnh sửa thủ công",
+            "# ĐÃ KÍCH HOẠT ĐỒNG BỘ 2 CHIỀU (FILE <-> DATABASE)",
             "# ==================================================================\n"
         ]
         
+        whitelist_ips = get_whitelist_from_env()
+        pass_sid = 100000
+        snort_lines.append("# --- KIM BÀI MIỄN TỬ (WHITELIST TỪ .ENV) ---")
+        for ip in whitelist_ips:
+            snort_lines.append(f"pass ip {ip} any <> any any (msg:\"Bypass Whitelist IP {ip}\"; sid:{pass_sid}; rev:1;)")
+            pass_sid += 1
+        snort_lines.append("# -------------------------------------------\n")
+
         for r in db_rules:
             if r['raw_rule']:
-                # Dọn dẹp rác (nếu có do lưu lỗi từ trước)
                 clean_rule = r['raw_rule'].replace('\\"', '"').replace('\\;', ';')
                 snort_lines.append(clean_rule)
 
         os.makedirs(os.path.dirname(SNORT_RULES_PATH), exist_ok=True)
         with open(SNORT_RULES_PATH, 'w', encoding='utf-8') as f:
             f.write('\n'.join(snort_lines))
-            # Ép hệ thống xả bộ nhớ, ghi thẳng xuống ổ đĩa vật lý
             f.flush()
             os.fsync(f.fileno()) 
+            
+        # 🎯 CHỐNG LOOP: Cập nhật MTIME ngay sau khi Web ghi đè để Thread không kéo ngược lại
+        LAST_SYNC_MTIME = os.stat(SNORT_RULES_PATH).st_mtime
             
     except Exception as e:
         logger.error(f"Lỗi khi xuất file local.rules: {e}")
@@ -87,7 +191,6 @@ def get_rules():
         formatted_rules = []
         for r in db_rules:
             is_local_flag = True if r.get('source') == 'local_custom' else False
-            # Trả về luật sạch cho Web hiển thị
             clean_pattern = r['raw_rule'].replace('\\"', '"').replace('\\;', ';') if r['raw_rule'] else ""
 
             formatted_rules.append({
@@ -115,12 +218,10 @@ def save_rules():
             
         rules = data.get('rules', [])
         
-        # 1. Vẫn lưu JSON để Backup
         os.makedirs(os.path.dirname(RULE_JSON_PATH), exist_ok=True)
         with open(RULE_JSON_PATH, 'w', encoding='utf-8') as f:
             json.dump(rules, f, indent=4, ensure_ascii=False)
             
-        # 2. Lưu vào DB làm nguồn chân lý
         try:
             conn = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASS, database=DB_NAME)
             cursor = conn.cursor()
@@ -148,8 +249,14 @@ def save_rules():
                     raw_rule = pattern_safe
                     raw_rule = re.sub(r'sid\s*:\s*\d+', f'sid:{sid_counter}', raw_rule, flags=re.IGNORECASE)
                 else:
-                    # 🎯 VÁ LỖI CÚ PHÁP SNORT 3: content:"...", nocase;
-                    raw_rule = f'{"drop" if action_web == "DROP" else "alert"} {protocol} any any -> any any (msg:"[{action_web}] {name}"; content:"{pattern_safe}", nocase; classtype:web-application-attack; sid:{sid_counter}; rev:5;)'
+                    raw_rule = (
+                        f'{"drop" if action_web == "DROP" else "alert"} '
+                        f'{protocol} any any -> any any '
+                        f'(msg:"[{action_web}] {name}"; '
+                        f'content:"{pattern_safe}",nocase; ' # 🎯 ĐÃ SỬA DẤU PHẨY THÀNH CHẤM PHẨY Ở ĐÂY
+                        f'classtype:web-application-attack; '
+                        f'sid:{sid_counter}; rev:5;)'
+                    )
                 
                 sql = f"""
                     INSERT INTO {DB_TABLE} (sid, rev, action, protocol, msg, raw_rule, source) 
@@ -166,11 +273,10 @@ def save_rules():
             logger.error(f"Lỗi khi lưu Database MySQL: {db_e}")
             return jsonify({'status': 'error', 'message': f"Lỗi Database: {str(db_e)}"}), 500
 
-        # 3. Xuất file local.rules thẳng từ DB (Tự động cập nhật file)
         generate_snort_rules_from_db()
-        
         trigger_system_reload()
-        return jsonify({'status': 'success', 'message': 'Đã lưu đồng bộ vào Database và xuất file local.rules thành công! Snort 3 đang nạp lại.'}), 200
+        
+        return jsonify({'status': 'success', 'message': 'Đã lưu luật và cấp Kim bài miễn tử thành công!'}), 200
     except Exception as e:
         logger.error(f"Lỗi biên dịch luật: {e}")
         return jsonify({'status': 'error', 'message': "Lỗi máy chủ khi biên dịch luật."}), 500

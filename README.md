@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🛡️ BK-IDS SOC: ENTERPRISE HYBRID DETECTION SYSTEM
+#  BK-IDS SOC: ENTERPRISE HYBRID DETECTION SYSTEM
 ### *Lõi Bảo mật Phân tích Luồng dữ liệu và Ngăn chặn Tấn công Thời gian thực*
 
 [![Version](https://img.shields.io/badge/Version-1.0.0--Stable-0ea5e9?style=for-the-badge)](https://github.com/dotuyen2409/bk_ids)

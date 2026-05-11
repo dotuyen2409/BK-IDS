@@ -168,3 +168,91 @@ def get_misuse_alerts():
     finally:
         if cursor: cursor.close()
         if db_conn and _is_db_connected(db_conn): db_conn.close()
+
+# ==========================================
+# 🟢 MODULE MỚI: TRUY VẤN DANH SÁCH GÓI TIN SOC
+# ==========================================
+def get_recent_alerts():
+    """ 
+    Truy vấn 50 cảnh báo/gói tin bất thường gần nhất từ cơ sở dữ liệu BK-IDS (Bảng ids_dulieu)
+    Kết hợp phân tích giao thức và thuật toán CUSUM để tạo thông điệp SOC.
+    """
+    db_conn = None
+    cursor = None
+    try:
+        db_conn = get_db_connection()
+        if not _is_db_connected(db_conn):
+            return jsonify({'status': 'error', 'message': "Mất kết nối Database Cảm biến."}), 500
+
+        # Cố gắng gọi DictCursor (Phòng thủ Tuple/Dict)
+        try:
+            cursor = db_conn.cursor(pymysql.cursors.DictCursor)
+        except Exception:
+            cursor = db_conn.cursor()
+        
+        # Truy vấn các bản ghi mới nhất từ bảng dữ liệu IDS
+        sql = """
+            SELECT id, tg_ketthuc as time, top_ip as src_ip, 
+                   soluong_tcp as tcp, soluong_udp as udp, soluong_icmp as icmp,
+                   Gn as gn
+            FROM ids_dulieu 
+            ORDER BY id DESC LIMIT 50
+        """
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        
+        alerts_list = []
+        for row_data in rows:
+            # Xử lý an toàn cả Tuple và Dictionary
+            if isinstance(row_data, (tuple, list)):
+                row = {
+                    'id': row_data[0],
+                    'time': row_data[1],
+                    'src_ip': row_data[2],
+                    'tcp': row_data[3],
+                    'udp': row_data[4],
+                    'icmp': row_data[5],
+                    'gn': row_data[6]
+                }
+            else:
+                row = dict(row_data)
+
+            # Xử lý an toàn định dạng thời gian
+            time_val = row.get('time')
+            time_str = time_val.strftime('%Y-%m-%d %H:%M:%S') if isinstance(time_val, datetime) else str(time_val) if time_val else "Unknown"
+            
+            # Phân tích giao thức chiếm ưu thế
+            counts = {'TCP': int(row.get('tcp') or 0), 'UDP': int(row.get('udp') or 0), 'ICMP': int(row.get('icmp') or 0)}
+            dominant_proto = max(counts, key=counts.get)
+            if sum(counts.values()) == 0:
+                dominant_proto = 'UNKNOWN'
+
+            # Gắn cờ cảnh báo dựa trên chỉ số thuật toán CUSUM (Gn)
+            gn_score = float(row.get('gn') or 0)
+            if gn_score > 5.0:
+                msg = "[CUSUM] Phát hiện Dấu hiệu tấn công DoS/DDoS"
+            elif sum(counts.values()) > 1000:
+                msg = "[Cảnh báo] Lưu lượng mạng gia tăng bất thường"
+            else:
+                msg = "[Snort] Gói tin mạng có cấu trúc không an toàn"
+
+            # Đóng gói kết quả trả về Frontend
+            alerts_list.append({
+                'id': f"#{row['id']}",
+                'time': time_str,
+                'src_ip': row['src_ip'],
+                'src_port': 'Dynamic',    
+                'dst_ip': 'Hệ thống Đích',
+                'dst_port': 'Dynamic',
+                'protocol': dominant_proto,
+                'message': msg
+            })
+
+        return jsonify({'status': 'success', 'data': alerts_list}), 200
+        
+    except Exception as e:
+        logger.error(f"Lỗi truy xuất danh sách cảnh báo (get_recent_alerts): {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': f"Lỗi CSDL: {str(e)}"}), 500
+    finally:
+        if cursor: cursor.close()
+        if db_conn and _is_db_connected(db_conn): db_conn.close()

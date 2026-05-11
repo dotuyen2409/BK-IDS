@@ -1,3 +1,5 @@
+# /home/bk_ids/bk-ids/web_dashboard/backend_api/config/database.py
+
 import mysql.connector
 import os
 import logging

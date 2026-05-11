@@ -1,0 +1,392 @@
+<!-- /home/bk_ids/bk-ids/web_dashboard/frontend/pages/alerts-explorer.html -->
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Truy vấn Cảnh báo - Hệ thống Bk-IDS SOC</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        /* ==========================================
+           CẤU HÌNH GIAO DIỆN SOC DOANH NGHIỆP
+           ========================================== */
+        :root {
+            --bg-base: #020617;        
+            --bg-surface: #0f172a;     
+            --bg-elevated: #1e293b;    
+            --border-subtle: #334155;  
+            --text-main: #f8fafc;      
+            --text-muted: #94a3b8;     
+            
+            --accent-cyan: #06b6d4;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --accent-green: #10b981;
+            --accent-purple: #a855f7;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; height: 100vh; overflow: hidden; 
+            background-color: var(--bg-base); font-family: 'Inter', sans-serif; color: var(--text-main);
+        }
+        
+        #app { display: flex; height: 100vh; width: 100vw; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-base); }
+        ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* ==========================================
+           SIDEBAR ĐỒNG BỘ
+           ========================================== */
+        .sidebar {
+            width: 250px; background: var(--bg-surface); border-right: 1px solid var(--border-subtle);
+            display: flex; flex-direction: column; padding: 20px 0; z-index: 100; flex-shrink: 0;
+        }
+        .brand { text-align: center; padding-bottom: 20px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 15px; }
+        .nav-link {
+            display: block; padding: 10px 20px; color: var(--text-muted); text-decoration: none; 
+            font-size: 0.9rem; font-weight: 500; transition: 0.2s; border-left: 3px solid transparent;
+        }
+        .nav-link:hover { color: var(--text-main); background: rgba(255,255,255,0.02); }
+        .nav-link.active {
+            color: var(--text-main); background: rgba(6, 182, 212, 0.1); border-left: 3px solid var(--accent-cyan); font-weight: 600;
+        }
+
+        /* ==========================================
+           NỘI DUNG CHÍNH & HEADER
+           ========================================== */
+        .main-content { 
+            flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--bg-base);
+        }
+        
+        .header-section {
+            padding: 24px 30px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface);
+        }
+        
+        .page-title-row {
+            display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;
+        }
+        .page-title h2 { margin: 0; font-size: 1.4rem; font-weight: 600; color: var(--text-main); }
+        .page-subtitle { color: var(--text-muted); font-size: 0.85rem; margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+
+        .btn { 
+            padding: 8px 16px; border-radius: 4px; font-weight: 600; font-size: 0.85rem; cursor: pointer; 
+            display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; transition: 0.2s; 
+        }
+        .btn-primary { background: var(--accent-blue); color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-outline { background: transparent; border-color: var(--border-subtle); color: var(--text-main); }
+        .btn-outline:hover { background: var(--bg-elevated); border-color: var(--text-muted); }
+        .btn-danger-outline { background: transparent; border-color: rgba(239, 68, 68, 0.5); color: var(--accent-red); }
+        .btn-danger-outline:hover { background: rgba(239, 68, 68, 0.1); }
+
+        /* ==========================================
+           KHU VỰC BỘ LỌC
+           ========================================== */
+        .dashboard-ribbon {
+            display: flex; gap: 20px; background: var(--bg-elevated); padding: 12px 20px; border-radius: 6px; align-items: center;
+        }
+        .filter-group { display: flex; align-items: center; gap: 10px; flex: 1; }
+        
+        .filter-tag {
+            display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; 
+            font-weight: 600; text-transform: uppercase; border: 1px solid var(--border-subtle); background: var(--bg-base); color: var(--text-muted);
+        }
+        .filter-tag.active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(6, 182, 212, 0.05); }
+        .filter-tag span.val { color: var(--text-main); margin-left: 6px; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 2px; }
+
+        .search-box {
+            background: var(--bg-base); border: 1px solid var(--border-subtle); color: var(--text-main); 
+            padding: 8px 12px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; width: 250px;
+        }
+        .search-box:focus { outline: none; border-color: var(--accent-blue); }
+
+        /* ==========================================
+           BẢNG DỮ LIỆU
+           ========================================== */
+        .table-container {
+            flex: 1; overflow: auto; padding: 0 30px 30px 30px; margin-top: 20px;
+        }
+        
+        table {
+            width: 100%; border-collapse: collapse; text-align: left;
+        }
+        
+        thead {
+            position: sticky; top: 0; background: var(--bg-base); z-index: 10;
+        }
+        
+        th {
+            padding: 12px 16px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--text-muted); border-bottom: 2px solid var(--border-subtle);
+        }
+        
+        td {
+            padding: 12px 16px; font-size: 0.85rem; border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-main); vertical-align: middle; transition: background-color 0.2s;
+        }
+        
+        tbody tr:hover { background: rgba(255, 255, 255, 0.02); cursor: pointer; }
+        tbody tr.selected { background: rgba(6, 182, 212, 0.08); }
+        
+        .col-id { font-family: 'JetBrains Mono', monospace; color: var(--text-muted); font-size: 0.8rem; }
+        .col-msg { font-weight: 500; }
+        .msg-snort { color: var(--accent-yellow); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; margin-right: 8px; border: 1px solid var(--accent-yellow); padding: 1px 4px; border-radius: 2px;}
+        .col-time { font-family: 'JetBrains Mono', monospace; color: var(--text-muted); font-size: 0.8rem; }
+        .col-ip { font-family: 'JetBrains Mono', monospace; }
+        .ip-src { color: var(--accent-red); }
+        .ip-dst { color: var(--accent-green); }
+        
+        .badge-proto { 
+            display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; 
+            background: rgba(59, 130, 246, 0.15); border: 1px solid var(--accent-blue); color: var(--accent-blue); 
+        }
+
+        input[type="checkbox"] {
+            appearance: none; width: 16px; height: 16px; border: 1px solid var(--border-subtle); 
+            border-radius: 3px; background: var(--bg-base); cursor: pointer; position: relative;
+        }
+        input[type="checkbox"]:checked { background: var(--accent-cyan); border-color: var(--accent-cyan); }
+        input[type="checkbox"]:checked::after {
+            content: '✓'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: var(--bg-base); font-size: 12px; font-weight: bold;
+        }
+
+        .table-footer {
+            display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; 
+            background: var(--bg-surface); border-top: 1px solid var(--border-subtle); font-size: 0.85rem; color: var(--text-muted);
+        }
+
+        /* Biểu tượng tải dữ liệu */
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 3px solid var(--accent-cyan);
+            width: 20px; height: 20px; -webkit-animation: spin 1s linear infinite; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="brand">
+                <span style="font-size: 1.2rem; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px;">Bk-IDS SOC</span>
+            </div>
+            <a href="index.html" class="nav-link">Tổng quan (Dashboard)</a>
+            <div style="margin-top: 20px;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Hệ thống bắt gói tin</div>
+                <a href="capture-config.html" class="nav-link">Cấu hình & Tiền xử lý</a>
+            </div>
+            <div style="margin-top: 20px;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện bất thường</div>
+                <a href="index_sensor.html" class="nav-link">Theo dõi cảm biến</a>
+                <a href="anomaly-config.html" class="nav-link">Cấu hình ngưỡng</a>
+            </div>
+            <div style="margin-top: 20px;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện lạm dụng</div>
+                <a href="index_ips.html" class="nav-link">Theo dõi IPS</a>
+                <a href="alerts-explorer.html" class="nav-link active">Truy vấn cảnh báo</a>
+                <a href="rules-config.html" class="nav-link">Cài đặt luật (Snort)</a>
+            </div>
+        </aside>
+
+        <!-- NỘI DUNG CHÍNH -->
+        <main class="main-content">
+            <div class="header-section">
+                <div class="page-title-row">
+                    <div class="page-title">
+                        <h2>Kết quả truy vấn: Cảnh báo hệ thống</h2>
+                        <div class="page-subtitle">Thời gian truy vấn: {{ currentQueryTime }} | Đã lưu {{ selectedAlerts.length }} cảnh báo vào bộ nhớ tạm</div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-outline" @click="fetchAlertsData">Cập nhật dữ liệu</button>
+                        <button class="btn btn-primary">Phân tích nâng cao</button>
+                    </div>
+                </div>
+
+                <div class="dashboard-ribbon">
+                    <div class="filter-group">
+                        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Tiêu chuẩn lọc:</span>
+                        <div class="filter-tag active">Toàn cục <span class="val">BẤT KỲ</span></div>
+                        <div class="filter-tag">Địa chỉ IP <span class="val">BẤT KỲ</span></div>
+                        <div class="filter-tag active">Giao thức <span class="val">BẤT KỲ</span></div>
+                        <div class="filter-tag">Thông tin (Payload) <span class="val">BẤT KỲ</span></div>
+                    </div>
+                    <div>
+                        <input type="text" class="search-box" placeholder="Tìm kiếm IP hoặc Thông báo..." v-model="searchQuery">
+                    </div>
+                </div>
+                
+                <div style="margin-top: 15px; font-size: 0.8rem; color: var(--text-muted); display: flex; gap: 20px;">
+                    <div><span style="color: var(--text-main); font-weight: 600;">Tình trạng chung:</span> Hiển thị cảnh báo từ CSDL thật.</div>
+                    <div v-if="isLoading" style="color: var(--accent-cyan);"><div class="loader"></div> Đang kết nối tới CSDL...</div>
+                    <div v-else>Đang hiển thị <span style="color: var(--text-main); font-weight: bold;">{{ filteredAlerts.length }}</span> cảnh báo phù hợp.</div>
+                </div>
+            </div>
+
+            <!-- BẢNG DỮ LIỆU CẢNH BÁO -->
+            <div class="table-container">
+                <div v-if="apiError" style="background: rgba(239,68,68,0.05); border: 1px solid var(--accent-red); padding: 16px; border-radius: 8px; margin-bottom: 20px; color: var(--accent-red);">
+                    Lỗi tải dữ liệu: {{ apiError }}
+                </div>
+
+                <table v-else>
+                    <thead>
+                        <tr>
+                            <th style="width: 40px; text-align: center;">
+                                <input type="checkbox" @change="toggleSelectAll" :checked="isAllSelected">
+                            </th>
+                            <th style="width: 120px;">Mã Cảnh Báo (ID)</th>
+                            <th>Thông Báo Sự Kiện</th>
+                            <th style="width: 180px;">Thời Gian Ghi Nhận</th>
+                            <th style="width: 180px;">Địa Chỉ Nguồn</th>
+                            <th style="width: 180px;">Địa Chỉ Đích</th>
+                            <th style="width: 100px; text-align: center;">Loại Gói</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="alert in filteredAlerts" :key="alert.id" 
+                            :class="{ 'selected': selectedAlerts.includes(alert.id) }"
+                            @click="viewDetails(alert)">
+                            <td style="text-align: center;" @click.stop>
+                                <input type="checkbox" :value="alert.id" v-model="selectedAlerts">
+                            </td>
+                            <td class="col-id">{{ alert.id }}</td>
+                            <td class="col-msg">
+                                <span class="msg-snort">[snort]</span>
+                                {{ alert.message }}
+                            </td>
+                            <td class="col-time">{{ alert.time }}</td>
+                            <td class="col-ip ip-src">{{ alert.src_ip }}:{{ alert.src_port }}</td>
+                            <td class="col-ip ip-dst">{{ alert.dst_ip }}:{{ alert.dst_port }}</td>
+                            <td style="text-align: center;">
+                                <span class="badge-proto">{{ alert.protocol }}</span>
+                            </td>
+                        </tr>
+                        <tr v-if="!isLoading && filteredAlerts.length === 0">
+                            <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                Không tìm thấy cảnh báo nào trong hệ thống.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- CHÂN TRANG ĐIỀU KHIỂN -->
+            <div class="table-footer" v-if="selectedAlerts.length > 0">
+                <div>Đã chọn <span style="color: var(--text-main); font-weight: bold;">{{ selectedAlerts.length }}</span> mục.</div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-outline">Đánh dấu đã đọc</button>
+                    <button class="btn btn-danger-outline" @click="selectedAlerts = []">Xóa các lựa chọn</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const searchQuery = ref('');
+                const selectedAlerts = ref([]);
+                const currentQueryTime = ref('');
+                
+                // Các biến trạng thái API
+                const rawAlerts = ref([]);
+                const isLoading = ref(true);
+                const apiError = ref(null);
+
+                // HÀM GỌI DỮ LIỆU THẬT TỪ BACKEND
+                const fetchAlertsData = async () => {
+                    isLoading.value = true;
+                    apiError.value = null;
+                    try {
+                        const apiHost = window.location.hostname;
+                        // URL trỏ tới API Backend của bạn (Đảm bảo route/endpoint này tồn tại trên server)
+                        const url = `http://${apiHost}:5050/backend_api/routes/api.php?route=get_recent_alerts`;
+                        
+                        const res = await fetch(url, { cache: 'no-store' });
+                        const json = await res.json();
+                        
+                        if (json.status === 'success') {
+                            rawAlerts.value = json.data; // Gán dữ liệu thật từ DB vào biến
+                        } else {
+                            apiError.value = json.message || "Không thể tải danh sách cảnh báo.";
+                        }
+                    } catch (e) {
+                        apiError.value = "Lỗi kết nối đến Backend API: " + e.message;
+                    } finally {
+                        isLoading.value = false;
+                    }
+                };
+
+                const filteredAlerts = computed(() => {
+                    const query = searchQuery.value.toLowerCase().trim();
+                    if (!query) return rawAlerts.value;
+                    return rawAlerts.value.filter(alert => {
+                        // Đảm bảo các trường dữ liệu tồn tại trước khi dùng includes()
+                        const ipSrc = alert.src_ip || '';
+                        const ipDst = alert.dst_ip || '';
+                        const msg = alert.message || '';
+                        const alertId = String(alert.id || '');
+
+                        return ipSrc.includes(query) || 
+                               ipDst.includes(query) || 
+                               msg.toLowerCase().includes(query) ||
+                               alertId.toLowerCase().includes(query);
+                    });
+                });
+
+                const isAllSelected = computed(() => {
+                    return filteredAlerts.value.length > 0 && selectedAlerts.value.length === filteredAlerts.value.length;
+                });
+
+                const toggleSelectAll = (event) => {
+                    if (event.target.checked) {
+                        selectedAlerts.value = filteredAlerts.value.map(a => a.id);
+                    } else {
+                        selectedAlerts.value = [];
+                    }
+                };
+
+                // Điều hướng sang trang chi tiết với dữ liệu thật
+                const viewDetails = (alert) => {
+                    const targetUrl = `packet-details.html?ip=${encodeURIComponent(alert.src_ip)}&time=${encodeURIComponent(alert.time)}&status=Bất thường`;
+                    window.location.href = targetUrl;
+                };
+
+                onMounted(() => {
+                    // Hiển thị giờ hiện tại
+                    const now = new Date();
+                    currentQueryTime.value = now.toLocaleString('vi-VN', { 
+                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit', second: '2-digit' 
+                    });
+
+                    // Gọi API lấy dữ liệu thật ngay khi tải trang
+                    fetchAlertsData();
+                });
+
+                return {
+                    searchQuery,
+                    rawAlerts,
+                    filteredAlerts,
+                    selectedAlerts,
+                    isAllSelected,
+                    currentQueryTime,
+                    isLoading,
+                    apiError,
+                    fetchAlertsData,
+                    toggleSelectAll,
+                    viewDetails
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

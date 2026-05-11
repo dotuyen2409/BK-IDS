@@ -4,12 +4,12 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Điều Tra Bất Thường (DPI) - Bk-IDS SOC Enterprise</title>
+    <title>Điều tra bất thường (DPI) - Hệ thống Bk-IDS SOC</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         /* ==========================================
-           ENTERPRISE SOC THEME CONFIGURATION
+           CẤU HÌNH GIAO DIỆN SOC DOANH NGHIỆP
            ========================================== */
         :root {
             --bg-base: #020617;        /* Slate 950 */
@@ -34,13 +34,13 @@
         
         #app { display: flex; height: 100vh; width: 100vw; }
         
-        /* Scrollbar */
+        /* Thanh cuộn (Scrollbar) */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: var(--bg-base); }
         ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-        /* Sidebar Styling (Đồng bộ Menu) */
+        /* Định dạng thanh bên (Sidebar) */
         .sidebar {
             width: 250px; background: var(--bg-surface); border-right: 1px solid var(--border-subtle);
             display: flex; flex-direction: column; padding: 20px 0; z-index: 100; flex-shrink: 0;
@@ -55,12 +55,12 @@
             color: var(--text-main); background: rgba(6, 182, 212, 0.1); border-left: 3px solid var(--accent-cyan); font-weight: 600;
         }
 
-        /* Main Content */
+        /* Nội dung chính */
         .main-content { 
             flex: 1; height: 100vh; overflow-y: auto; padding: 0 30px 50px 30px; box-sizing: border-box; scroll-behavior: smooth;
         }
         
-        /* Header Actions */
+        /* Các hành động trên Header */
         .header-actions { 
             display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px;
             margin-bottom: 24px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 16px; 
@@ -72,20 +72,24 @@
         }
         .back-link:hover { color: var(--text-main); transform: translateX(-3px); }
 
-        /* Buttons */
+        /* Nút bấm và Nhãn */
         .btn { 
             padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer; 
             display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; transition: 0.2s; 
         }
         .btn-primary { background: var(--accent-blue); color: #fff; }
-        .btn-primary:hover { background: #2563eb; box-shadow: 0 4px 12px rgba(59,130,246,0.3); }
         .btn-outline { background: transparent; border-color: var(--border-subtle); color: var(--text-main); }
         .btn-outline:hover { background: var(--bg-elevated); }
-
-        /* Grid Layout */
-        .dpi-container { display: grid; grid-template-columns: 320px 1fr; gap: 24px; }
         
-        /* Panel Styling */
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .badge-red { background: rgba(239, 68, 68, 0.15); border: 1px solid var(--accent-red); color: var(--accent-red); }
+        .badge-green { background: rgba(16, 185, 129, 0.15); border: 1px solid var(--accent-green); color: var(--accent-green); }
+        .badge-blue { background: rgba(59, 130, 246, 0.15); border: 1px solid var(--accent-blue); color: var(--accent-blue); }
+
+        /* Bố cục lưới */
+        .dpi-container { display: grid; grid-template-columns: 360px 1fr; gap: 24px; }
+        
+        /* Bảng điều khiển (Panel) */
         .panel { 
             background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); 
         }
@@ -95,28 +99,37 @@
         }
         .panel-body { padding: 20px; }
 
-        /* IP Hero Section */
-        .ip-hero { text-align: center; padding: 10px 0 20px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 20px; }
-        .ip-hero .flag { font-size: 2.5rem; margin-bottom: 10px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
-        .ip-hero .ip-address { font-size: 1.5rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        /* Thông tin IP Nguồn */
+        .ip-hero { text-align: center; padding: 10px 0 20px; border-bottom: 1px dashed var(--border-subtle); margin-bottom: 20px; }
+        .ip-hero .ip-address { font-size: 1.7rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-bottom: 5px; }
+        .ip-hero .geo-location { color: var(--text-main); font-weight: 600; font-size: 0.95rem; }
+        .ip-hero .isp-info { color: var(--text-muted); font-size: 0.8rem; margin-top: 4px; }
         
-        /* Key-Value List */
-        .kv-list { display: flex; flex-direction: column; gap: 12px; }
+        /* Danh sách thông số */
+        .kv-list { display: flex; flex-direction: column; gap: 14px; }
         .kv-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
-        .kv-label { color: var(--text-muted); font-weight: 500; }
+        .kv-label { color: var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: 6px; }
         .kv-val { color: var(--text-main); font-weight: 600; text-align: right; font-family: 'JetBrains Mono', monospace; }
 
-        /* Layers Grid (L2, L3, L4) */
+        /* Lưới các lớp mạng (L2, L3, L4) */
         .layers-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
-        .layer-box { background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px; }
+        .layer-box { background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px; position: relative; }
+        /* Thêm vạch màu cho từng Lớp OSI */
+        .layer-box::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 8px 8px 0 0; background: var(--border-subtle); }
+        .layer-box:nth-child(1)::before { background: var(--accent-purple); }
+        .layer-box:nth-child(2)::before { background: var(--accent-blue); }
+        .layer-box:nth-child(3)::before { background: var(--accent-yellow); }
+        
         .layer-box h4 { margin: 0 0 15px 0; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; }
         
-        .prop-grid { display: flex; flex-direction: column; gap: 10px; }
-        .prop { display: flex; justify-content: space-between; align-items: center; }
+        .prop-grid { display: flex; flex-direction: column; gap: 12px; }
+        .prop { display: flex; flex-direction: column; gap: 4px; }
+        .prop-row { display: flex; justify-content: space-between; align-items: center; }
         .prop-key { font-size: 0.75rem; color: var(--text-muted); }
-        .prop-val { font-size: 0.85rem; color: var(--text-main); font-family: 'JetBrains Mono', monospace; font-weight: 600; text-align: right; word-break: break-all; max-width: 65%; }
+        .prop-val { font-size: 0.85rem; color: var(--text-main); font-family: 'JetBrains Mono', monospace; font-weight: 600; text-align: right; word-break: break-all; }
+        .service-tag { font-size: 0.65rem; background: var(--bg-elevated); padding: 2px 6px; border-radius: 4px; color: var(--accent-cyan); margin-left: 6px; vertical-align: middle; }
 
-        /* Wireshark Terminal (Hex & ASCII) */
+        /* Terminal chứa Hexdump và ASCII */
         .hex-terminal { 
             background: #000; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px; 
             font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; line-height: 1.6; color: var(--accent-green); 
@@ -128,7 +141,7 @@
             margin-top: 16px; word-break: break-all;
         }
 
-        /* Loading & Error States */
+        /* Biểu tượng tải dữ liệu */
         .loader {
             border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top: 3px solid var(--accent-cyan);
             width: 24px; height: 24px; -webkit-animation: spin 1s linear infinite; animation: spin 1s linear infinite; margin-right: 10px;
@@ -140,137 +153,187 @@
     <div id="app">
         <aside class="sidebar">
             <div class="brand">
-                <span style="font-size: 1.2rem; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px;"> Bk-IDS SOC</span>
+                <span style="font-size: 1.2rem; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px;">Bk-IDS SOC</span>
             </div>
-            <a href="index.html" class="nav-link">⌂ Tổng quan (Dashboard)</a>
+            <a href="index.html" class="nav-link">Tổng quan bảng điều khiển</a>
             <div style="margin-top: 20px;">
-                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Hệ thống Bắt gói tin</div>
-                <a href="capture-config.html" class="nav-link">⚙ Cấu hình & Tiền xử lý</a>
-            </div>
-            <div style="margin-top: 20px;">
-                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện Bất thường</div>
-                <a href="index_sensor.html" class="nav-link active">Theo Dõi Cảm Biến</a>
-                <a href="anomaly-config.html" class="nav-link">Cấu hình Ngưỡng</a>
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Hệ thống bắt gói tin</div>
+                <a href="capture-config.html" class="nav-link">Cấu hình và Tiền xử lý</a>
             </div>
             <div style="margin-top: 20px;">
-                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện Lạm dụng</div>
-                <a href="index_ips.html" class="nav-link">Theo Dõi IPS</a>
-                <a href="alerts-explorer.html" class="nav-link"> Truy vấn Cảnh báo</a>
-                <a href="rules-config.html" class="nav-link">Cài đặt Luật (Snort 3)</a>
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện bất thường</div>
+                <a href="index_sensor.html" class="nav-link">Theo dõi cảm biến</a>
+                <a href="anomaly-config.html" class="nav-link">Cấu hình ngưỡng</a>
+            </div>
+            <div style="margin-top: 20px;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện lạm dụng</div>
+                <a href="index_ips.html" class="nav-link active">Theo dõi IPS</a>
+                <a href="alerts-explorer.html" class="nav-link">Truy vấn cảnh báo</a>
+                <a href="rules-config.html" class="nav-link">Cài đặt luật (Snort 3)</a>
             </div>
         </aside>
 
         <main class="main-content">
             <div v-if="isLoading" style="height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-main); font-size: 1rem; font-weight: 500;">
-                <div class="loader"></div> Đang phân tích Mạng Chuyên Sâu (DPI)...
+                <div class="loader"></div> Đang thu thập và giải mã gói tin (DPI)...
             </div>
 
             <div v-else-if="apiError" style="background: rgba(239,68,68,0.05); border: 1px solid var(--accent-red); padding: 24px; border-radius: 8px; margin-top: 30px;">
-                <h3 style="margin-top:0; color: var(--accent-red); font-size: 1.1rem; display: flex; align-items: center; gap: 8px;"> Lỗi Phân Tích Dữ Liệu</h3>
+                <h3 style="margin-top:0; color: var(--accent-red); font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">Lỗi phân tích dữ liệu</h3>
                 <p style="color: var(--text-main); font-size: 0.95rem; line-height: 1.5;">{{ apiError }}</p>
-                <button @click="goBack" class="btn btn-outline" style="margin-top: 15px;">← Quay lại Bảng điều khiển</button>
+                <button @click="goBack" class="btn btn-outline" style="margin-top: 15px;">Quay lại bảng điều khiển</button>
             </div>
 
             <div v-else>
                 <div class="header-actions">
                     <div class="title-block">
-                        <button @click="goBack" class="back-link">← Trở về</button>
-                        <h2>Điều Tra Bất Thường Cấp Độ Gói Tin (DPI)</h2>
-                        <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 5px; font-family: 'JetBrains Mono', monospace;">Thời điểm lấy mẫu: {{ pkt.time }}</div>
+                        <button @click="goBack" class="back-link">Trở về sự kiện</button>
+                        <h2>Điều tra gói tin mạng chuyên sâu</h2>
+                        <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 5px; font-family: 'JetBrains Mono', monospace;">
+                            Mã sự kiện: EVT-{{ pkt.time.replace(/[- :]/g, '') }} | Lấy mẫu lúc: {{ pkt.time }}
+                        </div>
                     </div>
                     <div>
-                        <button class="btn btn-outline" onclick="alert('Tính năng Export PCAP đang được phát triển.')">⬇ Xuất File PCAP</button>
+                        <button class="btn btn-outline" onclick="alert('Tính năng xuất tệp PCAP để mở bằng Wireshark đang được phát triển.')">Xuất tệp PCAP</button>
                     </div>
                 </div>
 
                 <div class="dpi-container">
+                    <!-- CỘT 1: THREAT INTEL & CHỈ SỐ -->
                     <div class="panel">
                         <div class="panel-header">
-                            <span> Mục Tiêu Điều Tra</span>
+                            <span>Tình báo mối đe dọa (IP Nguồn)</span>
                         </div>
                         <div class="panel-body">
                             <div class="ip-hero">
-                                <div class="flag" v-if="isPrivateIP(pkt.ip)">🏠</div>
-                                <div class="flag" v-else></div>
-                                <div class="ip-address" :style="{ color: ['Bất thường', 'DROP'].includes(status) ? 'var(--accent-red)' : 'var(--text-main)'}">{{ pkt.ip }}</div>
-                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">IP SOURCE (KẺ TẤN CÔNG)</div>
+                                <div class="ip-address" :style="{ color: ['Bất thường', 'DROP'].includes(status) ? 'var(--accent-red)' : 'var(--text-main)'}">
+                                    {{ pkt.ip }}
+                                </div>
+                                <div v-if="geoLoading" style="font-size: 0.8rem; color: var(--text-muted);">Đang định vị...</div>
+                                <div v-else-if="geoData.city">
+                                    <div class="geo-location">{{ geoData.city }}, {{ geoData.country }}</div>
+                                    <div class="isp-info">Nhà mạng (ISP): {{ geoData.isp }} <br> ASN: {{ geoData.as }}</div>
+                                </div>
+                                <div v-else-if="isPrivateIP(pkt.ip)">
+                                    <div class="geo-location">Mạng nội bộ</div>
+                                    <div class="isp-info">Hệ thống mạng LAN cục bộ</div>
+                                </div>
+                                <div v-else class="isp-info">Không có dữ liệu định vị địa chỉ IP.</div>
                             </div>
                             
                             <div class="kv-list">
                                 <div class="kv-row">
-                                    <span class="kv-label">Đánh giá hệ thống</span>
-                                    <span class="kv-val" :style="{color: ['Bất thường', 'DROP'].includes(status) ? 'var(--accent-red)' : 'var(--accent-green)'}">
-                                        {{ ['Bất thường', 'DROP'].includes(status) ? 'PHÁT HIỆN TẤN CÔNG' : 'BÌNH THƯỜNG' }}
+                                    <span class="kv-label">Trạng thái nhận diện</span>
+                                    <span :class="['Bất thường', 'DROP'].includes(status) ? 'badge badge-red' : 'badge badge-green'">
+                                        {{ ['Bất thường', 'DROP'].includes(status) ? 'PHÁT HIỆN TẤN CÔNG' : 'AN TOÀN' }}
                                     </span>
                                 </div>
                                 <div class="kv-row" v-if="pkt.parsed">
-                                    <span class="kv-label">Giao thức Chiếm ưu thế</span>
-                                    <span class="kv-val" style="color: var(--accent-cyan);">{{ pkt.protocol }}</span>
+                                    <span class="kv-label">Giao thức mạng chính</span>
+                                    <span class="badge badge-blue">{{ pkt.protocol }}</span>
                                 </div>
                                 <div class="kv-row">
-                                    <span class="kv-label">Tổng tải (TCP/UDP/ICMP)</span>
+                                    <span class="kv-label">Khối lượng gói tin (TCP/UDP/ICMP)</span>
                                     <span class="kv-val">{{ pkt.tcp }} / {{ pkt.udp }} / {{ pkt.icmp }}</span>
                                 </div>
                                 <div class="kv-row">
-                                    <span class="kv-label">CuSUM Score (Gn)</span>
-                                    <span class="kv-val" style="color: var(--accent-yellow);">{{ pkt.gn !== null ? pkt.gn : 'N/A' }}</span>
+                                    <span class="kv-label" title="Chỉ số thay đổi đột biến CUSUM (Càng cao càng nguy hiểm)">Điểm CuSUM (Biến động)</span>
+                                    <span class="kv-val" style="color: var(--accent-yellow);">{{ pkt.gn !== null ? pkt.gn : 'Không có' }}</span>
                                 </div>
                                 <div class="kv-row">
-                                    <span class="kv-label">Entropy Score</span>
-                                    <span class="kv-val" style="color: var(--accent-purple);">{{ pkt.entropi !== null ? pkt.entropi : 'N/A' }}</span>
+                                    <span class="kv-label" title="Chỉ số hỗn loạn Entropy (Dấu hiệu của DDoS/Scan)">Độ hỗn loạn (Entropy)</span>
+                                    <span class="kv-val" style="color: var(--accent-purple);">{{ pkt.entropi !== null ? pkt.entropi : 'Không có' }}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
+                    <!-- CỘT 2: CHI TIẾT OSI & PAYLOAD -->
                     <div class="panel">
                         <div class="panel-header">
-                            <span>📦 Dissection Lớp Mạng (OSI Model Breakdown)</span>
+                            <span>Phân tích Mô hình OSI (Lớp 2 - Lớp 4)</span>
                         </div>
                         <div class="panel-body" style="padding-bottom: 0;" v-if="pkt.parsed">
                             <div class="layers-grid">
+                                <!-- Lớp 2 -->
                                 <div class="layer-box">
-                                    <h4>Data Link (Layer 2)</h4>
+                                    <h4>Lớp 2: Liên kết dữ liệu</h4>
                                     <div class="prop-grid">
-                                        <div class="prop"><span class="prop-key">MAC Nguồn</span><span class="prop-val">{{ pkt.parsed.mac_src }}</span></div>
-                                        <div class="prop"><span class="prop-key">MAC Đích</span><span class="prop-val">{{ pkt.parsed.mac_dst }}</span></div>
-                                        <div class="prop"><span class="prop-key">EtherType</span><span class="prop-val" style="color: var(--accent-cyan);">{{ pkt.parsed.ethertype }}</span></div>
+                                        <div class="prop">
+                                            <div class="prop-row"><span class="prop-key">MAC Nguồn</span><span class="prop-val">{{ pkt.parsed.mac_src }}</span></div>
+                                        </div>
+                                        <div class="prop">
+                                            <div class="prop-row"><span class="prop-key">MAC Đích</span><span class="prop-val">{{ pkt.parsed.mac_dst }}</span></div>
+                                        </div>
+                                        <div class="prop">
+                                            <div class="prop-row"><span class="prop-key">EtherType</span><span class="prop-val" style="color: var(--accent-cyan);">{{ pkt.parsed.ethertype }}</span></div>
+                                        </div>
                                     </div>
                                 </div>
 
+                                <!-- Lớp 3 -->
                                 <div class="layer-box">
-                                    <h4>Network (Layer 3)</h4>
+                                    <h4>Lớp 3: Mạng</h4>
                                     <div class="prop-grid">
-                                        <div class="prop"><span class="prop-key">IP Nguồn</span><span class="prop-val" style="color: var(--accent-red);">{{ pkt.parsed.ip_src }}</span></div>
-                                        <div class="prop"><span class="prop-key">IP Đích</span><span class="prop-val">{{ pkt.parsed.ip_dst }}</span></div>
-                                        <div class="prop"><span class="prop-key">Header Len</span><span class="prop-val" style="color: var(--accent-yellow);">{{ pkt.parsed.ip_header_len || 'N/A' }}</span></div>
-                                        <div class="prop"><span class="prop-key">Total Len</span><span class="prop-val" style="color: var(--accent-purple);">{{ pkt.parsed.total_len || 'N/A' }}</span></div>
+                                        <div class="prop">
+                                            <div class="prop-row"><span class="prop-key">IP Nguồn</span><span class="prop-val" style="color: var(--accent-red);">{{ pkt.parsed.ip_src }}</span></div>
+                                        </div>
+                                        <div class="prop">
+                                            <div class="prop-row"><span class="prop-key">IP Đích</span><span class="prop-val">{{ pkt.parsed.ip_dst }}</span></div>
+                                        </div>
+                                        <div class="prop">
+                                            <div class="prop-row"><span class="prop-key">Độ dài Header / Tổng cộng</span><span class="prop-val" style="color: var(--accent-yellow);">{{ pkt.parsed.ip_header_len }} / {{ pkt.parsed.total_len }}</span></div>
+                                        </div>
                                     </div>
                                 </div>
 
+                                <!-- Lớp 4 -->
                                 <div class="layer-box">
-                                    <h4>Transport (Layer 4)</h4>
+                                    <h4>Lớp 4: Giao vận</h4>
                                     <div class="prop-grid" v-if="pkt.parsed.actual_proto && pkt.parsed.actual_proto.includes('ICMP')">
-                                        <div class="prop"><span class="prop-key">ICMP Type</span><span class="prop-val" style="color: var(--accent-yellow);">{{ pkt.parsed.icmp_type }}</span></div>
-                                        <div class="prop"><span class="prop-key">ICMP Code</span><span class="prop-val" style="color: var(--accent-yellow);">{{ pkt.parsed.icmp_code }}</span></div>
+                                        <div class="prop">
+                                            <div class="prop-row"><span class="prop-key">Loại ICMP</span><span class="prop-val" style="color: var(--accent-yellow);">{{ pkt.parsed.icmp_type }}</span></div>
+                                        </div>
+                                        <div class="prop">
+                                            <div class="prop-row"><span class="prop-key">Mã ICMP</span><span class="prop-val" style="color: var(--accent-yellow);">{{ pkt.parsed.icmp_code }}</span></div>
+                                        </div>
                                     </div>
                                     <div class="prop-grid" v-else>
-                                        <div class="prop"><span class="prop-key">Protocol</span><span class="prop-val">{{ pkt.parsed.actual_proto }}</span></div>
-                                        <div class="prop"><span class="prop-key">Cổng Nguồn</span><span class="prop-val" style="color: var(--accent-yellow);">{{ pkt.parsed.src_port }}</span></div>
-                                        <div class="prop"><span class="prop-key">Cổng Đích</span><span class="prop-val" style="color: var(--accent-yellow);">{{ pkt.parsed.dst_port }}</span></div>
+                                        <div class="prop">
+                                            <div class="prop-row">
+                                                <span class="prop-key">Cổng nguồn</span>
+                                                <span class="prop-val">
+                                                    {{ pkt.parsed.src_port }}
+                                                    <span class="service-tag">{{ getServiceName(pkt.parsed.src_port) }}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="prop">
+                                            <div class="prop-row">
+                                                <span class="prop-key">Cổng đích</span>
+                                                <span class="prop-val" style="color: var(--accent-yellow);">
+                                                    {{ pkt.parsed.dst_port }}
+                                                    <span class="service-tag">{{ getServiceName(pkt.parsed.dst_port) }}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="prop">
+                                            <div class="prop-row"><span class="prop-key">Giao thức</span><span class="prop-val">{{ pkt.parsed.actual_proto }}</span></div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
+                        <!-- Lớp 7 Payload -->
                         <div class="panel-header" style="border-top: 1px solid var(--border-subtle); border-radius: 0;">
-                            <span>🔢 Application Payload (Layer 7: Hexdump & ASCII)</span>
+                            <span>Lớp 7: Dữ liệu ứng dụng (Hexdump và Giải mã ASCII)</span>
                         </div>
                         <div class="panel-body">
                             <div class="hex-terminal">{{ pkt.parsed?.formatted_hex || pkt.hex_dump }}</div>
                             
                             <div class="ascii-box" v-if="pkt.parsed && pkt.parsed.ascii_payload && pkt.parsed.ascii_payload.trim() !== ''">
-                                <span style="color: var(--accent-cyan); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; font-family: 'Inter', sans-serif; letter-spacing: 0.5px;">[BỘ GIẢI MÃ PAYLOAD ASCII]</span><br>
+                                <span style="color: var(--accent-cyan); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Trích xuất dữ liệu ASCII</span><br>
                                 <span style="margin-top: 10px; display: inline-block;">{{ pkt.parsed.ascii_payload }}</span>
                             </div>
                         </div>
@@ -282,17 +345,53 @@
 
     <script>
         const { createApp, ref, onMounted } = Vue;
+        
         createApp({
             setup() {
                 const pkt = ref({});
                 const status = ref('');
                 const isLoading = ref(true);
                 const apiError = ref(null);
+                
+                // Trạng thái cho việc tra cứu vị trí địa lý
+                const geoData = ref({});
+                const geoLoading = ref(false);
+
+                // Danh sách nhận diện cổng thông dụng
+                const commonPorts = {
+                    '80': 'HTTP', '443': 'HTTPS', '22': 'SSH', '21': 'FTP', '53': 'DNS',
+                    '3389': 'RDP', '445': 'SMB', '23': 'Telnet', '3306': 'MySQL', '25': 'SMTP'
+                };
+
+                const getServiceName = (port) => {
+                    return commonPorts[port] || 'Động';
+                };
 
                 const isPrivateIP = (ip) => {
                     if (!ip) return false;
                     const parts = ip.split('.');
                     return parts[0] === '10' || (parts[0] === '172' && (parseInt(parts[1]) >= 16 && parseInt(parts[1]) <= 31)) || parts[0] === '192' || ip === '127.0.0.1';
+                };
+
+                // Gọi API ngoại để lấy Vị trí Thành phố thật
+                const fetchGeoIP = async (ip) => {
+                    if (isPrivateIP(ip)) {
+                        geoData.value = { countryCode: 'LOCAL' };
+                        return;
+                    }
+                    geoLoading.value = true;
+                    try {
+                        // Sử dụng IP-API (Miễn phí, không cần khóa truy cập)
+                        const res = await fetch(`http://ip-api.com/json/${ip}`);
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                            geoData.value = data;
+                        }
+                    } catch (e) {
+                        console.error("Không thể lấy dữ liệu định vị IP", e);
+                    } finally {
+                        geoLoading.value = false;
+                    }
                 };
 
                 const goBack = () => { window.history.back(); };
@@ -302,9 +401,10 @@
                         const urlParams = new URLSearchParams(window.location.search);
                         const ip = urlParams.get('ip');
                         const time = urlParams.get('time');
-                        status.value = urlParams.get('status') || 'Unknown';
+                        status.value = urlParams.get('status') || 'Chưa xác định';
 
                         const apiHost = window.location.hostname;
+                        // URL trỏ vào backend 
                         const url = `http://${apiHost}:5050/backend_api/routes/api.php?route=get_packet_details&ip=${encodeURIComponent(ip)}&time=${encodeURIComponent(time)}`;
                         
                         const res = await fetch(url, { cache: 'no-store' });
@@ -312,6 +412,10 @@
                         
                         if (json.status === 'success') {
                             pkt.value = json.data;
+                            // Sau khi tải dữ liệu gói tin thành công, lấy vị trí tấn công thật
+                            if (pkt.value.ip) {
+                                fetchGeoIP(pkt.value.ip);
+                            }
                         } else {
                             apiError.value = json.message || "Không tìm thấy dữ liệu Hexdump cho gói tin này.";
                         }
@@ -323,7 +427,10 @@
                 };
 
                 onMounted(() => { fetchPacketData(); });
-                return { pkt, status, isLoading, apiError, isPrivateIP, goBack };
+                return { 
+                    pkt, status, isLoading, apiError, goBack, 
+                    geoData, geoLoading, isPrivateIP, getServiceName
+                };
             }
         }).mount('#app');
     </script>

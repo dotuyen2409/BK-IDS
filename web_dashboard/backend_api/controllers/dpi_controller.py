@@ -1,3 +1,5 @@
+# /home/bk_ids/bk-ids/web_dashboard/backend_api/controllers/dpi_controller.py
+
 import sys
 import os
 import re
@@ -228,6 +230,74 @@ def get_packet_details():
         # Ngăn chặn rò rỉ bộ nhớ (Memory Leak Protection)
         if cursor: 
             cursor.close()
+        if db_conn:
+            if hasattr(db_conn, 'open') and db_conn.open: db_conn.close()
+            elif hasattr(db_conn, 'is_connected') and db_conn.is_connected(): db_conn.close()
+
+
+
+from datetime import datetime
+
+def get_recent_alerts():
+    """ 
+    API Endpoint: Lấy danh sách 50 cảnh báo/gói tin bất thường gần nhất từ CSDL
+    """
+    db_conn = None
+    cursor = None
+    try:
+        db_conn = get_db_connection()
+        cursor = db_conn.cursor(dictionary=True)
+        
+        # Truy vấn 50 bản ghi mới nhất từ bảng ids_dulieu
+        sql = """
+            SELECT id, tg_ketthuc as time, top_ip as src_ip, 
+                   soluong_tcp as tcp, soluong_udp as udp, soluong_icmp as icmp,
+                   Gn as gn
+            FROM ids_dulieu 
+            ORDER BY id DESC LIMIT 50
+        """
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        
+        alerts_list = []
+        for row in rows:
+            # 1. Chuẩn hóa thời gian
+            time_str = row['time'].strftime('%Y-%m-%d %H:%M:%S') if isinstance(row['time'], datetime) else str(row['time'])
+            
+            # 2. Phân tích giao thức chiếm ưu thế
+            counts = {'TCP': int(row.get('tcp') or 0), 'UDP': int(row.get('udp') or 0), 'ICMP': int(row.get('icmp') or 0)}
+            dominant_proto = max(counts, key=counts.get)
+            if sum(counts.values()) == 0:
+                dominant_proto = 'UNKNOWN'
+
+            # 3. Đánh giá cảnh báo dựa trên điểm CuSUM (Gn)
+            gn_score = float(row.get('gn') or 0)
+            if gn_score > 5.0:
+                msg = "[Phát hiện] Dấu hiệu tấn công DoS/DDoS (CuSUM cao)"
+            elif sum(counts.values()) > 1000:
+                msg = "[Cảnh báo] Lưu lượng gói tin tăng đột biến"
+            else:
+                msg = "[Bất thường] Nhận dạng mẫu mạng không hợp lệ"
+
+            # Đóng gói dữ liệu trả về Frontend
+            alerts_list.append({
+                'id': f"#{row['id']}",
+                'time': time_str,
+                'src_ip': row['src_ip'],
+                'src_port': 'Dynamic',    # Có thể nâng cấp parse từ database sau
+                'dst_ip': 'Mạng nội bộ',  # Đích đến là hệ thống của bạn
+                'dst_port': 'Dynamic',
+                'protocol': dominant_proto,
+                'message': msg
+            })
+
+        return jsonify({'status': 'success', 'data': alerts_list}), 200
+        
+    except Exception as e:
+        logger.error(f"Lỗi truy xuất danh sách cảnh báo: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': f"Lỗi CSDL: {str(e)}"}), 500
+    finally:
+        if cursor: cursor.close()
         if db_conn:
             if hasattr(db_conn, 'open') and db_conn.open: db_conn.close()
             elif hasattr(db_conn, 'is_connected') and db_conn.is_connected(): db_conn.close()

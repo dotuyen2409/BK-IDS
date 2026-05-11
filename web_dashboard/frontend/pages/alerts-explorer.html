@@ -144,15 +144,15 @@
 <body> 
     <div id="app">
         <div class="toast" :class="[toast.type, { show: toast.visible }]">
-            <span v-if="toast.type==='success'">✅</span>
-            <span v-else>❌</span>
+            <span v-if="toast.type==='success'"></span>
+            <span v-else></span>
             <span style="font-weight: 500;">{{ toast.message }}</span>
         </div>
 
         <aside class="sidebar">
             <div class="brand">
                 <span style="font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: 1px;">
-                    <span style="color: var(--accent-cyan);">Bk-IDS</span> SOC
+                    <span style="color: var(--accent-cyan);">Bk-IDS</span>
                 </span>
             </div>
             <a href="index.html" class="nav-link">⌂ Tổng quan (Dashboard)</a>
@@ -172,10 +172,10 @@
                 </div>
                 <div class="soc-tabs">
                     <button class="tab-btn" :class="{ 'active': activeTab === 'alerts' }" @click="activeTab = 'alerts'">
-                        📊 Nhật ký Cảnh báo
+                         Nhật ký Cảnh báo
                     </button>
                     <button class="tab-btn" :class="{ 'active-danger': activeTab === 'firewall' }" @click="activeTab = 'firewall'">
-                        🛡️ Quản lý Firewall <span v-if="bannedIps.length" style="background: var(--accent-red); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.65rem; margin-left: 5px;">{{ bannedIps.length }}</span>
+                         Quản lý Firewall <span v-if="bannedIps.length" style="background: var(--accent-red); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.65rem; margin-left: 5px;">{{ bannedIps.length }}</span>
                     </button>
                 </div>
             </div>
@@ -187,7 +187,7 @@
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                                 <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main); font-weight: 600;">Bộ Lọc Dữ Liệu</h3>
                                 <button class="btn-action btn-export" @click="exportToCSV" title="Xuất dữ liệu ra file Excel/CSV">
-                                    📥 Xuất Báo Cáo CSV
+                                     Xuất Báo Cáo CSV
                                 </button>
                             </div>
                             <div class="filter-grid">
@@ -265,8 +265,8 @@
                                         </td>
                                         <td class="log-mono log-sig">{{ alert.sig_name }}</td>
                                         <td style="text-align: center;">
-                                            <span v-if="alert.action === 'DROP'" class="badge badge-drop">⛔ DROP</span>
-                                            <span v-else class="badge badge-alert">⚠️ ALERT</span>
+                                            <span v-if="alert.action === 'DROP'" class="badge badge-drop">CHẶN</span>
+                                            <span v-else class="badge badge-alert">CẢNH BÁO</span>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -320,7 +320,7 @@
                                     </tr>
                                     <tr v-if="bannedIps.length === 0">
                                         <td colspan="4" style="text-align: center; padding: 50px; color: var(--accent-green);">
-                                            <div style="font-size: 2rem; margin-bottom: 10px;">🛡️</div>
+                                            <div style="font-size: 2rem; margin-bottom: 10px;"></div>
                                             Tường lửa đang sạch. Không có IP nào bị phong tỏa.
                                         </td>
                                     </tr>

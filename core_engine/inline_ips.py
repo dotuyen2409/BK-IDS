@@ -14,6 +14,7 @@ import queue
 import pymysql
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 
 sys.path.append('/app')
 
@@ -174,6 +175,20 @@ class BkSocIPSEngine:
                 )
             except Exception: return None
 
+    def _get_rule_msg(self, sid):
+        try:
+            conn = self.get_db_connection()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT msg FROM rules WHERE sid = %s", (sid,))
+                row = cursor.fetchone()
+                conn.close()
+                if row and row['msg']:
+                    return row['msg']
+        except Exception:
+            pass
+        return None
+
     # ---------------------------------------------------------
     # WORKERS CHẠY NGẦM
     # ---------------------------------------------------------
@@ -192,38 +207,30 @@ class BkSocIPSEngine:
             time.sleep(10)
 
     def snort_watchdog_worker(self):
+        spam_counter = 0  # 🎯 Thêm biến đếm chống Spam
         while self.is_running:
             time.sleep(15)
             if self.snort_process and self.snort_process.poll() is not None:
+                spam_counter += 1
                 self.logger.critical(f"{Colors.RED}☠️ BÁO ĐỘNG: Lõi Snort 3 đã chết đột ngột! Đang tiến hành Auto-Healing...{Colors.ENDC}")
-                self.executor.submit(self.send_telegram_alert, "Tiến trình Lõi Snort 3 IPS đã bị sập. Đang tiến hành khôi phục tự động (Auto-Healing)...", "CRITICAL")
+                
+                # 🎯 CHỈ GỬI TELEGRAM TỐI ĐA 3 LẦN NẾU LIÊN TỤC SẬP
+                if spam_counter <= 3:
+                    self.executor.submit(self.send_telegram_alert, f"Tiến trình Lõi Snort 3 IPS đã bị sập (Lần {spam_counter}). Đang tiến hành khôi phục tự động (Auto-Healing)...", "CRITICAL")
+                elif spam_counter == 4:
+                    self.executor.submit(self.send_telegram_alert, "⚠️ [ANTI-SPAM] Lõi Snort 3 liên tục sập (cấu hình sai hoặc lỗi hệ thống). Đã TẠM DỪNG gửi tin nhắn cảnh báo để tránh Spam. Vui lòng kiểm tra Docker Log!", "WARNING")
+                
                 self.start_snort_core()
+            else:
+                # Nếu Snort sống khỏe qua 15s, reset lại bộ đếm Spam
+                spam_counter = 0
 
     def metrics_worker(self):
         while self.is_running:
             time.sleep(60)
             self.logger.info(f"📊 METRICS | Xử lý: {self.metrics['alerts_processed']} | Chặn: {self.metrics['ips_dropped']} | CSDL: {self.metrics['db_writes']}")
 
-    def db_writer_worker(self):
-        conn = None
-        while self.is_running or not self.db_queue.empty():
-            try:
-                if not conn or not conn.open: conn = self.get_db_connection()
-                batch = []
-                try:
-                    while len(batch) < 100:
-                        batch.append(self.db_queue.get(timeout=2))
-                except queue.Empty: pass
-
-                if batch and conn and conn.open:
-                    cursor = conn.cursor()
-                    sql = "INSERT INTO misuse_alerts (timestamp, ip_src, sig_name, protocol, action) VALUES (%s, %s, %s, %s, %s)"
-                    cursor.executemany(sql, batch)
-                    conn.commit()
-                    cursor.close()
-                    self.metrics['db_writes'] += len(batch)
-            except Exception: time.sleep(5) 
-        if conn and conn.open: conn.close()
+    
 
     def ban_manager_worker(self):
         while self.is_running:
@@ -299,6 +306,10 @@ class BkSocIPSEngine:
         try:
             alert = json.loads(line)
             
+            if not isinstance(alert, dict):
+                return
+
+            # --- 1. Lấy IP Nguồn (ip_src) ---
             src_ip = 'Unknown'
             if 'src_addr' in alert:
                 src_ip = alert['src_addr']
@@ -308,33 +319,57 @@ class BkSocIPSEngine:
             if src_ip.startswith("::ffff:"):
                 src_ip = src_ip.replace("::ffff:", "")
 
-            if src_ip == 'Unknown':
+            # --- 2. Lấy IP Đích (ip_dst) ---
+            dst_ip = 'Unknown'
+            if 'dst_addr' in alert:
+                dst_ip = alert['dst_addr']
+            elif 'dst_ap' in alert:
+                dst_ip = alert['dst_ap'].split(':')[0] if ':' in alert['dst_ap'] else alert['dst_ap']
+                
+            if dst_ip.startswith("::ffff:"):
+                dst_ip = dst_ip.replace("::ffff:", "")
+
+            if src_ip == 'Unknown' or dst_ip == 'Unknown':
                 ips = re.findall(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', line)
-                for ip in ips:
-                    dst_addr = alert.get('dst_addr', alert.get('dst_ap', '')).split(':')[0]
-                    if ip != dst_addr:
-                        src_ip = ip
-                        break
+                if len(ips) >= 1 and src_ip == 'Unknown': src_ip = ips[0]
+                if len(ips) >= 2 and dst_ip == 'Unknown': dst_ip = ips[1]
 
             is_whitelisted = self.is_noise_ip(src_ip)
             protocol = str(alert.get('proto', 'TCP')).upper()
-            raw_msg = alert.get('msg', 'Unknown Signature')
-            action_snort = str(alert.get('action', 'alert')).upper()
+            
+            # --- 3. 🎯 VÁ LỖI TÊN MÃ ĐỘC (Dịch mã GID:SID:REV) ---
+            raw_msg = alert.get('msg')
+            if not raw_msg and 'rule' in alert:
+                if isinstance(alert['rule'], dict):
+                    raw_msg = alert['rule'].get('msg')
+                else:
+                    raw_msg = str(alert['rule'])
+            
+            # Nếu Snort nhả ra dạng "1:1000001:5", bóc số 1000001 ra chọc vào Database lấy tên xịn
+            if raw_msg and re.match(r'^\d+:(\d+):\d+$', raw_msg):
+                sid = re.match(r'^\d+:(\d+):\d+$', raw_msg).group(1)
+                real_msg = self._get_rule_msg(sid)
+                if real_msg:
+                    raw_msg = real_msg
 
+            if not raw_msg:
+                raw_msg = 'Unknown Signature'
+
+            action_snort = str(alert.get('action', 'alert')).upper()
             action_db = "ALERT"
-            clean_msg = raw_msg.replace("[Bk-IDS]", "").strip()
+            
+            # Làm sạch chuỗi hiển thị
+            clean_msg = raw_msg.replace("[Bk-IDS]", "").replace("[DROP]", "").strip("- ")
             self.metrics['alerts_processed'] += 1
 
             if "[DROP]" in raw_msg or action_snort in ["BLOCK", "DROP", "REJECT"]:
                 action_db = "DROP"
-                clean_msg = clean_msg.replace("[DROP]", "").strip("- ")
                 if is_whitelisted:
                     self.logger.warning(f"{Colors.YELLOW}⚠️ [IDS] Tấn công từ IP Whitelist ({src_ip}): {clean_msg}{Colors.ENDC}")
                 else:
                     self.logger.warning(f"{Colors.PURPLE}🪓 [IPS] Máy chém xử lý: {src_ip} | Mã độc: {clean_msg}{Colors.ENDC}")
                     self.executor.submit(self.execute_firewall, src_ip, clean_msg)
             else:
-                clean_msg = clean_msg.replace("[ALERT]", "").strip("- ")
                 self.logger.info(f"{Colors.BLUE}👁️ [IDS] Cảnh báo: {src_ip} | Dấu hiệu: {clean_msg}{Colors.ENDC}")
                 
                 if not is_whitelisted:
@@ -353,67 +388,113 @@ class BkSocIPSEngine:
                         )
                         self.executor.submit(self.send_telegram_alert, alert_msg, "WARNING")
 
-            local_time = datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S')
+            # --- 4. 🎯 VÁ LỖI MÚI GIỜ (Ép cứng GMT+7 Việt Nam) ---
+            tz_vn = timezone(timedelta(hours=7))
+            local_time = datetime.now(tz_vn).strftime('%Y-%m-%d %H:%M:%S')
+            
             if not self.db_queue.full():
-                self.db_queue.put((local_time, src_ip, clean_msg, protocol, action_db))
-        except Exception: pass
+                self.db_queue.put((local_time, src_ip, dst_ip, clean_msg, protocol, action_db))
+        except Exception as e: 
+            self.logger.error(f"❌ Lỗi đọc Log Snort 3: {e}")
+
+    def db_writer_worker(self):
+        conn = None
+        while self.is_running or not self.db_queue.empty():
+            try:
+                if not conn or not conn.open: 
+                    conn = self.get_db_connection()
+                    if not conn:
+                        self.logger.error(f"{Colors.RED}❌ MẤT KẾT NỐI DATABASE! IPS không thể ghi log lên Web.{Colors.ENDC}")
+                        time.sleep(5)
+                        continue
+
+                batch = []
+                try:
+                    while len(batch) < 100:
+                        batch.append(self.db_queue.get(timeout=2))
+                except queue.Empty: pass
+
+                if batch and conn and conn.open:
+                    cursor = conn.cursor()
+                    # 🎯 VÁ LỖI CSDL: Bổ sung ip_dst vào câu lệnh INSERT (Thành 6 giá trị %s)
+                    sql = "INSERT INTO misuse_alerts (timestamp, ip_src, ip_dst, sig_name, protocol, action) VALUES (%s, %s, %s, %s, %s, %s)"
+                    cursor.executemany(sql, batch)
+                    conn.commit()
+                    cursor.close()
+                    self.metrics['db_writes'] += len(batch)
+                    self.logger.info(f"{Colors.GREEN}✅ Đã đồng bộ thành công {len(batch)} cảnh báo lên Website!{Colors.ENDC}")
+            except Exception as e:
+                self.logger.error(f"{Colors.RED}❌ LỖI GHI SQL VÀO CSDL: {e}{Colors.ENDC}")
+                time.sleep(5)
+        if conn and conn.open: conn.close()
+
 
     # ---------------------------------------------------------
     # KHỞI ĐỘNG VÀ QUẢN LÝ TIẾN TRÌNH SNORT
     # ---------------------------------------------------------
     def start_snort_core(self):
-        self.logger.info(f"{Colors.GREEN}🚀 Khởi động Lõi Snort 3 INLINE IPS (Enterprise Mode)...{Colors.ENDC}")
-        self.logger.info("🔗 Gắn chặt Iptables (Bỏ cờ bypass để ép giám sát 100%)...")
+        self.logger.info(f"{Colors.YELLOW}🛠️ Đang dọn dẹp hệ thống để khởi động Snort 3...{Colors.ENDC}")
         
+        # 1. Giết sạch Snort cũ để giải phóng NFQUEUE 0 (Tránh xung đột)
+        subprocess.run("pkill -9 snort", shell=True, check=False)
+        time.sleep(1)
+
+        # 2. Thiết lập Iptables (Gắn luồng traffic vào hàng đợi số 0)
         self.run_host_command("iptables -D DOCKER-USER -p tcp -m multiport --dports 80,8080,5000 -j NFQUEUE --queue-num 0 2>/dev/null || true")
         self.run_host_command("iptables -D INPUT -p tcp -m multiport --dports 80,8080,5000 -j NFQUEUE --queue-num 0 2>/dev/null || true")
-        
         self.run_host_command("iptables -I DOCKER-USER 1 -p tcp -m multiport --dports 80,8080,5000 -j NFQUEUE --queue-num 0")
         self.run_host_command("iptables -I INPUT 1 -p tcp -m multiport --dports 80,8080,5000 -j NFQUEUE --queue-num 0")
 
+        # 3. Tự động tìm kiếm Binary và DAQ (giữ nguyên logic cũ của bạn)
         def auto_discover_snort():
-            common_paths = ["/home/snorty/snort3/bin/snort", "/usr/local/snort/bin/snort", "/opt/snort/bin/snort", "/usr/local/bin/snort", "/usr/sbin/snort", "/usr/bin/snort"]
-            for p in common_paths:
-                if os.path.exists(p) and os.access(p, os.X_OK): return p
-            try:
-                out = subprocess.check_output("find / -name snort -type f -executable -print -quit 2>/dev/null", shell=True).decode().strip()
-                if out: return out
-            except Exception: pass
+            paths = ["/home/snorty/snort3/bin/snort", "/usr/local/bin/snort", "/usr/bin/snort"]
+            for p in paths:
+                if os.path.exists(p): return p
             return "snort"
 
         def auto_discover_daq_dir():
-            common_daq_dirs = ["/home/snorty/snort3/lib/daq", "/usr/local/lib/daq", "/usr/lib/daq", "/usr/local/lib64/daq", "/usr/lib64/daq", "/opt/snort/lib/daq"]
-            for d in common_daq_dirs:
-                if os.path.exists(d) and any(f.startswith('daq_nfq') for f in os.listdir(d)): return d
-            try:
-                out = subprocess.check_output("find / -name 'daq_nfq.so' -type f -print -quit 2>/dev/null", shell=True).decode().strip()
-                if out: return os.path.dirname(out)
-            except Exception: pass
+            dirs = ["/home/snorty/snort3/lib/daq", "/usr/local/lib/daq", "/usr/lib/daq"]
+            for d in dirs:
+                if os.path.exists(d): return d
             return "/usr/local/lib/daq"
 
-        snort_executable = auto_discover_snort()
-        daq_directory = auto_discover_daq_dir()
+        snort_bin = auto_discover_snort()
+        daq_dir = auto_discover_daq_dir()
         
-        self.logger.info(f"📍 Định vị Snort tại: {snort_executable} | DAQ tại: {daq_directory}")
+        # 🎯 LƯU Ý: Với DAQ nfq, Snort dùng tham số -i để định danh Queue ID
+        # Chúng ta dùng hàng đợi số 0 (khớp với lệnh iptables --queue-num 0)
+        queue_id = "0" 
         
+        self.logger.info(f"🚀 Khởi chạy Snort 3 [Inline Mode] [DAQ: nfq] [Queue ID: {queue_id}]")
+
         snort_cmd = [
-            snort_executable, "-c", "/app/snort.lua", 
-            "--daq-dir", daq_directory, 
-            "-Q", "--daq", "nfq", "--daq-var", "queue=0", 
-            "-l", "/var/log/snort", "-k", "none",
-            "--lua", "alert_json = { file = true }" 
+            snort_bin,
+            "-c", "/app/snort.lua",
+            "--daq-dir", daq_dir,
+            "-Q",
+            "--daq", "nfq",
+            "--daq-var", f"queue={queue_id}",
+            "-l", "/var/log/snort",
+            "-k", "none",
+            "--lua", "alert_json = { file = true }",
         ]
         
-        if os.path.exists("/app/core_engine/pulled_rules.rules"):
-            snort_cmd.extend(["-R", "/app/core_engine/pulled_rules.rules"])
+        # Thêm các tệp luật nếu tồn tại
+        # if os.path.exists("/app/core_engine/pulled_rules.rules"):
+        #     snort_cmd.extend(["-R", "/app/core_engine/pulled_rules.rules"])
         if os.path.exists("/app/core_engine/local.rules"):
             snort_cmd.extend(["-R", "/app/core_engine/local.rules"])
 
         try:
-            self.snort_process = subprocess.Popen(snort_cmd)
-            self.logger.info(f"{Colors.BLUE}🛡️ Engine Nội Tuyến (Inline) đã hòa mạng! Chờ đợi con mồi...{Colors.ENDC}")
+            # 🎯 NÂNG CẤP: Chuyển hướng stderr về stdout để bạn thấy lỗi trong 'docker logs'
+            self.snort_process = subprocess.Popen(
+                snort_cmd, 
+                stdout=None, 
+                stderr=subprocess.STDOUT
+            )
+            self.logger.info(f"{Colors.BLUE}🛡️ Engine Nội Tuyến (Inline) đã phục kích thành công!{Colors.ENDC}")
         except Exception as e:
-            self.logger.error(f"❌ Lỗi khởi động Snort FATAL: {e}", exc_info=True)
+            self.logger.error(f"❌ Lỗi khởi động Snort: {e}")
 
     def tail_logs(self):
         current_ino = -1

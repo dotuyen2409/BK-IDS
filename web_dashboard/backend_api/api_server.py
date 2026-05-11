@@ -35,13 +35,11 @@ RULE_JSON_PATH = '/app/core_engine/rules_db.json'
 SNORT_RULES_PATH = '/app/core_engine/local.rules' 
 
 # 🎯 NÂNG CẤP ENTERPRISE: Lưới bảo vệ toàn cục (Global Error Handler)
-# Ép mọi lỗi hệ thống (HTTP 500) phải trả về JSON để Frontend không bị báo "Mất kết nối"
 @app.errorhandler(Exception)
 def handle_global_error(e):
     logger.error(f"Lỗi Hệ thống Toàn cục: {e}", exc_info=True)
     return jsonify({'status': 'error', 'message': f'Lỗi API nội bộ: {str(e)}'}), 500
 
-# Áp dụng bộ Header Bảo mật chuyên dụng
 @app.after_request
 def apply_enterprise_security_headers(response):
     response.headers["X-Frame-Options"] = "DENY"
@@ -76,10 +74,15 @@ def gateway():
             return cusum_controller.get_statistics()
             
         # Nhóm 3: Signature & IPS Rules Management
-        # 🎯 FIX LỖI IMPORT CHÉO: Cô lập độc lập từng chức năng, không dùng chung else
         elif route == 'get_misuse_alerts':
             from controllers import alert_controller
             return alert_controller.get_misuse_alerts()
+            
+        # 🟢 ĐÃ THÊM ROUTE MỚI Ở ĐÂY ĐỂ TRỎ VÀO CONTROLLER
+        elif route == 'get_recent_alerts':
+            from controllers import alert_controller
+            return alert_controller.get_recent_alerts()
+            
         elif route == 'get_rules':
             from controllers import rules_controller
             return rules_controller.get_rules()
@@ -190,7 +193,6 @@ def update_rules_online():
         return jsonify({'status': 'error', 'message': 'Lỗi nội bộ Máy chủ SOC.'}), 500
 
 def get_banned_ips():
-    """ 🎯 NÂNG CẤP AN TOÀN I/O: Đọc Sổ đen Firewall không crash """
     try:
         state_file = '/app/bans_state.json'
         banned_data = {}
@@ -200,7 +202,6 @@ def get_banned_ips():
                 with open(state_file, 'r') as f:
                     banned_data = json.load(f)
             except json.JSONDecodeError:
-                # Tránh làm sập API nếu đọc file ngay khoảnh khắc Snort đang tiến hành ghi đè
                 logger.warning("File bans_state.json đang bị khóa tạm thời bởi quá trình ghi I/O.")
                 pass 
                 
@@ -210,7 +211,6 @@ def get_banned_ips():
         return jsonify({'status': 'error', 'message': f"Lỗi đọc Firewall State: {str(e)}"}), 500
 
 def unban_ip():
-    """ Lệnh ân xá - Can thiệp sâu vào Iptables để gỡ phong tỏa IP. """
     try:
         data = request.get_json()
         if not data or 'ip' not in data:

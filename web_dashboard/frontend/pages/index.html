@@ -4,12 +4,12 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Tổng Quan Hệ Thống - Bk-IDS SOC Enterprise</title>
+    <title>Tổng Quan Hệ Thống - Bk-IDS  Enterprise</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         /* ==========================================
-           ENTERPRISE SOC THEME CONFIGURATION
+           ENTERPRISE  THEME CONFIGURATION
            ========================================== */
         :root {
             --bg-base: #020617;        /* Slate 950 */
@@ -134,34 +134,32 @@
     <div id="app">
         <aside class="sidebar">
             <div class="brand">
-                <span style="font-size: 1.2rem; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px;"> Bk-IDS SOC</span>
+                <span style="font-size: 1.2rem; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px;"> Bk-IDS </span>
             </div>
-            
-            <a href="index.html" class="nav-link active">⌂ Tổng quan (Dashboard)</a>
-            
+            <a href="index.html" class="nav-link">⌂ Tổng quan (Dashboard)</a>
             <div style="margin-top: 20px;">
                 <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Hệ thống Bắt gói tin</div>
                 <a href="capture-config.html" class="nav-link">⚙ Cấu hình & Tiền xử lý</a>
             </div>
-            
             <div style="margin-top: 20px;">
                 <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện Bất thường</div>
                 <a href="index_sensor.html" class="nav-link">Theo Dõi Cảm Biến</a>
                 <a href="anomaly-config.html" class="nav-link">Cấu hình Ngưỡng</a>
             </div>
-            
             <div style="margin-top: 20px;">
                 <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; font-weight: 600;">Phát hiện Lạm dụng</div>
                 <a href="index_ips.html" class="nav-link">Theo Dõi IPS</a>
+                <a href="alerts-explorer.html" class="nav-link"> Truy vấn Cảnh báo</a>
                 <a href="rules-config.html" class="nav-link">Cài đặt Luật (Snort 3)</a>
             </div>
+            <a href="packet-list.html" class="nav-link">Danh sách các gói tin</a>
         </aside>
 
         <main class="main-content">
             <header class="fixed-header">
                 <div class="header-title">
-                    <h1>TRUNG TÂM ĐIỀU HÀNH AN NINH MẠNG</h1>
-                    <p>Bk-IDS Security Operations Center v2.0</p>
+                    <h1>HỆ THỐNG PHÁT HIỆN XÂM NHẬP DỰA TRÊN BẤT THƯỜNG BK-IDS</h1>
+                    <p>Sinh viên: Đỗ Ngọc Tuyên PM27.12</p>
                 </div>
                 <div class="sys-badge pulse">
                     HỆ THỐNG TRỰC CHIẾN
@@ -171,7 +169,7 @@
             <div class="dashboard-content">
                 <h3 class="section-title"> Sức khỏe Máy chủ Lõi (Core Health)</h3>
                 <div class="server-info-grid">
-                    <div class="info-box">
+                    <!-- <div class="info-box">
                         <h4>Mức tải CPU</h4>
                         <div class="value">{{ systemStats.cpu }}<span>%</span></div>
                         <div class="progress-bar">
@@ -184,7 +182,7 @@
                         <div class="progress-bar">
                             <div class="progress-fill" :style="{ width: systemStats.ram + '%', background: systemStats.ram > 80 ? 'var(--accent-red)' : 'var(--accent-purple)' }"></div>
                         </div>
-                    </div>
+                    </div> -->
                     <div class="info-box">
                         <h4>Card Mạng Giám Sát</h4>
                         <div class="value" style="color: var(--accent-cyan); font-size: 1.6rem;">ens33</div>
@@ -201,7 +199,7 @@
                 <div class="module-grid">
                     
                     <a href="index_sensor.html" class="module-card mod-anomaly">
-                        <div class="module-icon">👁️</div>
+                        <div class="module-icon"></div>
                         <h3 class="module-title">Cảm Biến Thụ Động (Anomaly)</h3>
                         <p class="module-desc">Theo dõi biểu đồ đánh giá mạng CuSUM và Entropy thời gian thực. Truy vết các cuộc tấn công DDoS, rà quét mạng diện rộng.</p>
                         <div class="mod-action">Vào Bảng Điều Khiển</div>
@@ -215,7 +213,7 @@
                     </a>
 
                     <a href="rules-config.html" class="module-card mod-rules">
-                        <div class="module-icon">📝</div>
+                        <div class="module-icon"></div>
                         <h3 class="module-title">Cơ Sở Tri Thức (Rules DB)</h3>
                         <p class="module-desc">Quản lý kho tàng luật nhận diện, đồng bộ Threat Intelligence từ Emerging Threats và cấp phát cấu hình cho Engine.</p>
                         <div class="mod-action">Quản Lý Tập Luật</div>
