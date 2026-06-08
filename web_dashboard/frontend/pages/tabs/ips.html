@@ -1,0 +1,110 @@
+<!-- pages/tabs/ips.html -->
+<section v-show="activeTab === 'ips'" class="view-section">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 style="margin:0;font-weight:600">Phát hiện Lạm dụng — Snort 3 Engine</h2>
+            <p class="text-muted mb-0" style="font-size:.85rem">Phân tích sâu gói tin (DPI), nhận diện Chữ ký độc hại.
+            </p>
+        </div>
+        <span class="status-dot" :class="ipsConnected ? 'status-dot--online' : 'status-dot--offline'">{{ ipsConnected ?
+            'SNORT 3 HOẠT ĐỘNG' : 'MẤT KẾT NỐI API' }}</span>
+    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card-glass health-card" :class="sysCpu > 80 ? 'health-card--critical' : 'health-card--healthy'">
+                <div class="health-card__label">Sức khỏe Máy chủ (CPU)</div>
+                <div class="health-card__value">{{ sysCpu }}%</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-glass health-card" :class="sysRam > 80 ? 'health-card--critical' : 'health-card--healthy'">
+                <div class="health-card__label">Sức khỏe Máy chủ (RAM)</div>
+                <div class="health-card__value">{{ sysRam }}%</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-glass health-card"
+                :class="snortRunning ? 'health-card--healthy' : 'health-card--critical'">
+                <div class="health-card__label">Lõi Bảo mật (Snort 3)</div>
+                <div class="health-card__value"
+                    :style="{color: snortRunning ? 'var(--accent-green)' : 'var(--accent-red)'}">{{ snortRunning ?
+                    'RUNNING' : 'STOPPED' }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-glass health-card health-card--warning">
+                <div class="health-card__label">Tường lửa (Đã chặn)</div>
+                <div class="health-card__value">{{ ipsDrops }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+            <div class="card-glass">
+                <h5 class="mb-3">Tần suất Cảnh báo theo Bộ Luật</h5>
+                <div style="height:280px"><canvas id="ipsMisuseChart"></canvas></div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card-glass">
+                <h5 class="mb-3">Tỷ lệ Giao thức</h5>
+                <div style="height:200px"><canvas id="ipsProtoChart"></canvas></div>
+                <div class="mt-3 p-2 rounded" style="background:var(--bg-base);border:1px solid var(--border)">
+                    <div class="d-flex justify-content-between mb-1"><span style="color:var(--accent-blue)">■
+                            TCP:</span><span class="mono fw-bold">{{ ipsProto.TCP || 0 }}</span></div>
+                    <div class="d-flex justify-content-between mb-1"><span style="color:var(--accent-purple)">■
+                            UDP:</span><span class="mono fw-bold">{{ ipsProto.UDP || 0 }}</span></div>
+                    <div class="d-flex justify-content-between"><span style="color:var(--accent-yellow)">■
+                            ICMP:</span><span class="mono fw-bold">{{ ipsProto.ICMP || 0 }}</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-glass mb-5">
+        <h5 class="mb-3">Nhật ký Tường lửa & Cảnh báo Snort (Thời gian thực)</h5>
+        <div style="max-height:400px;overflow-y:auto">
+            <table class="table table-dark-custom table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Thời gian</th>
+                        <th>Nguồn (DPI)</th>
+                        <th>Ứng dụng (L7)</th>
+                        <th>Giao thức</th>
+                        <th>Chữ ký Snort</th>
+                        <th>Hành động (SOAR)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(item, idx) in ipsTableData" :key="idx"
+                        :class="(item.severity || '').toLowerCase() === 'high' ? 'row-critical' : ''">
+                        <td class="mono text-muted" style="font-size:.8rem">{{ formatTime(item.timestamp || item.event_time) }}</td>
+                        <td class="mono" style="color:var(--accent-red);font-weight:700;cursor:pointer"
+                            @click="investigateDPI(item)">{{ item.ip_src || item.src_ip }}</td>
+                        <td class="fw-bold" style="color:var(--accent-cyan)">
+                            {{ item.app_id && item.app_id !== 'N/A' ? item.app_id : (item.dst_port === 80 || item.dst_port === 9000 || item.dst_port === 5000 ? 'HTTP' : (item.dst_port === 22 ? 'SSH' : (item.dst_port === 3306 ? 'MySQL' : 'N/A'))) }}
+                        </td>
+                        <td><span class="badge" :class="'badge-' + (item.protocol || 'TCP').toLowerCase()">{{
+                                (item.protocol || 'TCP').toUpperCase() }}</span></td>
+                        <td class="sig-cell" style="color:var(--accent-purple);font-weight:600">{{ item.sig_name ||
+                            item.signature }}</td>
+                        <td>
+                            <span v-if="(item.action || '').toUpperCase() === 'DROP' || item.soar_blocked === 1" class="badge bg-danger">
+                                <i class="fa-solid fa-shield-halved"></i> ĐÃ CHẶN (SOAR)
+                            </span>
+                            <div v-else class="d-flex gap-2 align-items-center">
+                                <span class="badge bg-warning text-dark"><i class="fa-solid fa-circle-info"></i> GIÁM SÁT</span>
+                                <button class="btn btn-sm btn-outline-danger"
+                                    @click="blockByHash(item.dedupe_hash, item.ip_src || item.src_ip)">
+                                    <i class="fa-solid fa-ban"></i> Chặn IP
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr v-if="ipsTableData.length === 0">
+                        <td colspan="6" class="text-center py-5 text-muted">{{ ipsConnected ? 'Hệ thống an toàn. Chưa ghi nhận xâm nhập.' : 'Đang đồng bộ...' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

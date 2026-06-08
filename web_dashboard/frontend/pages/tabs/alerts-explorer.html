@@ -1,0 +1,40 @@
+<!-- pages/tabs/alerts-explorer.html -->
+<section v-show="activeTab === 'alerts-explorer'" class="view-section">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div><h2 style="margin:0;font-weight:600">Trung tâm Điều tra & Ngăn chặn</h2><p class="text-muted mb-0" style="font-size:.85rem">Tra cứu gói tin DPI và Quản lý danh sách đen Tường lửa.</p></div>
+        <div class="d-flex gap-2"><button class="btn btn-sm" :class="explorerTab === 'alerts' ? 'btn-info' : 'btn-outline-secondary'" @click="explorerTab = 'alerts'">📋 Nhật ký Cảnh báo</button><button class="btn btn-sm" :class="explorerTab === 'firewall' ? 'btn-danger' : 'btn-outline-secondary'" @click="explorerTab = 'firewall'">🔥 Quản lý Firewall <span v-if="explorerBannedCount" class="badge bg-danger ms-1">{{ explorerBannedCount }}</span></button></div>
+    </div>
+    <div v-show="explorerTab === 'alerts'">
+        <div class="card-glass mb-4">
+            <div class="row g-3">
+                <div class="col-lg-8"><div class="row g-2"><div class="col-md-4"><label class="form-label text-muted" style="font-size:.7rem;text-transform:uppercase">IP Nguồn</label><input type="text" v-model="explorerFilters.ip" class="form-dark form-control form-control-sm" placeholder="192.168.1.5"></div><div class="col-md-4"><label class="form-label text-muted" style="font-size:.7rem;text-transform:uppercase">Chữ ký</label><input type="text" v-model="explorerFilters.sig" class="form-dark form-control form-control-sm" placeholder="Tìm tên mã độc..."></div><div class="col-md-2"><label class="form-label text-muted" style="font-size:.7rem;text-transform:uppercase">Giao thức</label><select v-model="explorerFilters.proto" class="form-select form-select-dark form-select-sm"><option value="">Tất cả</option><option value="TCP">TCP</option><option value="UDP">UDP</option><option value="ICMP">ICMP</option></select></div><div class="col-md-2"><label class="form-label text-muted" style="font-size:.7rem;text-transform:uppercase">Hành động</label><select v-model="explorerFilters.action" class="form-select form-select-dark form-select-sm"><option value="">Tất cả</option><option value="DROP">DROP</option><option value="ALERT">ALERT</option></select></div></div></div>
+                <div class="col-lg-4"><div class="p-3 rounded" style="background:var(--bg-base);border:1px solid var(--border)"><div class="d-flex justify-content-between mb-1"><span class="text-muted" style="font-size:.8rem">Sự kiện</span><span class="mono fw-bold">{{ explorerFilteredAlerts.length }}</span></div><div class="d-flex justify-content-between mb-1"><span class="text-muted" style="font-size:.8rem">Đã tiêu diệt</span><span class="mono fw-bold" style="color:var(--accent-red)">{{ explorerFilteredAlerts.filter(a=>a.action==='DROP').length }}</span></div><div class="d-flex justify-content-between"><span class="text-muted" style="font-size:.8rem">IP Tấn công</span><span class="mono fw-bold" style="color:var(--accent-yellow)">{{ new Set(explorerFilteredAlerts.map(a=>a.ip_src)).size }}</span></div><button class="btn btn-outline-info btn-sm w-100 mt-2" @click="fetchExplorerAlerts">↻ Làm mới</button></div></div>
+            </div>
+        </div>
+        <div class="card-glass mb-5">
+            <div style="max-height:500px;overflow-y:auto">
+                <table class="table table-dark-custom table-hover mb-0">
+                    <thead><tr><th>ID</th><th>Thời gian</th><th>IP Kẻ Tấn công</th><th>Giao thức</th><th>Chữ ký Payload</th><th>Trạng thái</th></tr></thead>
+                    <tbody>
+                        <tr v-for="(item, idx) in explorerFilteredAlerts" :key="idx"><td class="mono text-muted" style="font-size:.75rem">#{{ item.id }}</td><td class="mono text-muted" style="font-size:.75rem">{{ item.timestamp }}</td><td class="mono" style="color:var(--accent-cyan);font-weight:700">{{ item.ip_src }}</td><td><span class="badge" :class="'badge-' + (item.protocol || 'TCP').toLowerCase()">{{ item.protocol }}</span></td><td class="mono" style="font-size:.8rem">{{ item.sig_name }}</td><td><span class="badge" :class="item.action === 'DROP' ? 'badge-drop' : 'badge-alert'">{{ item.action === 'DROP' ? 'CHẶN' : 'CẢNH BÁO' }}</span></td></tr>
+                        <tr v-if="explorerFilteredAlerts.length === 0"><td colspan="6" class="text-center py-5 text-muted">Không có dữ liệu</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div v-show="explorerTab === 'firewall'">
+        <div class="card-glass mb-5" style="border-left:4px solid var(--accent-red)">
+            <div class="d-flex justify-content-between align-items-center mb-3"><div><h5 style="color:var(--accent-red);margin:0">Danh sách IP bị Phong tỏa (Iptables)</h5><p class="text-muted mb-0" style="font-size:.82rem">Các IP này đang bị ngắt kết nối hoàn toàn ở tầng Network.</p></div><button class="btn btn-outline-danger btn-sm" @click="fetchExplorerBanned">↻ Cập nhật</button></div>
+            <div style="max-height:500px;overflow-y:auto">
+                <table class="table table-dark-custom table-hover mb-0">
+                    <thead><tr><th>IP Bị khóa</th><th>Thời gian mở khóa</th><th>Lớp Mạng</th><th>Hành động</th></tr></thead>
+                    <tbody>
+                        <tr v-for="(item, idx) in explorerBanned" :key="idx"><td class="mono text-danger fw-bold">{{ item.ip }}</td><td class="mono text-muted"><span v-if="item.unban_time">{{ formatTime(item.unban_time) }}</span><span v-else>Vĩnh viễn</span></td><td><span class="badge badge-drop">IPTABLES L3</span></td><td><button class="btn btn-sm btn-outline-success" @click="unbanExplorerIP(item.ip)">🔓 Bỏ Chặn</button></td></tr>
+                        <tr v-if="explorerBanned.length === 0"><td colspan="4" class="text-center py-5 text-success">Tường lửa đang sạch. Không có IP nào bị phong tỏa.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>

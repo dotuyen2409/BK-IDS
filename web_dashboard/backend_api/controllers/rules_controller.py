@@ -1,285 +1,529 @@
-# /home/bk_ids/bk-ids/web_dashboard/backend_api/controllers/rules_controller.py
+# /home/ids/bk_ids/web_dashboard/backend_api/controllers/rules_controller.py
+"""
+BK-IDS SOC: Rules Controller — Thin API Wrapper (Enterprise Grade)
+===================================================================
+Tất cả business logic đã được chuyển sang core_engine/rule_compiler.py (SSOT).
+File này chỉ làm nhiệm vụ:
+  1. Nhận tham số từ Flask request (body JSON hoặc query params)
+  2. Gọi hàm tương ứng từ rule_compiler
+  3. Trả về JSON response
 
+Security: JWT Auth được xử lý bởi api_server.py (@require_jwt_auth decorator)
+Zero Trust: Mọi endpoint đều bọc try-except + traceback logging
+"""
 import sys
 import os
-import json
 import logging
-import subprocess
-import re
-import pymysql
-import threading
-import time
-from flask import request, jsonify
+import traceback
 
 sys.path.append('/app')
-try:
-    import threat_intel_updater
-except: pass
 
-logger = logging.getLogger(__name__)
+from flask import request, jsonify, g
 
-RULE_JSON_PATH = '/app/core_engine/rules_db.json'
-SNORT_RULES_PATH = '/app/core_engine/local.rules' 
+# Import SSOT từ core engine
+from core_engine.rule_compiler import (
+    get_all_rules,
+    save_rules,
+    update_rule,
+    delete_rule,
+    toggle_rule,
+    validate_rules_batch,
+    import_rules as _import_rules,
+    export_rules as _export_rules,
+    bulk_delete_rules,
+    bulk_toggle_rules,
+    get_templates,
+    get_audit_log,
+)
 
-DB_HOST = 'mysql_db' 
-DB_USER = 'root'
-DB_PASS = 'rootpassword' 
-DB_NAME = 'bk_ids'
-DB_TABLE = 'rules'
+logger = logging.getLogger("Bk-IDS-Rules-Engine")
 
-# 🎯 BIẾN TOÀN CỤC CHO ĐỒNG BỘ HAI CHIỀU
-LAST_SYNC_MTIME = 0
-WATCHER_STARTED = False
 
-# ========================================================================
-# CƠ CHẾ ĐỒNG BỘ NGƯỢC (FILE -> DATABASE)
-# ========================================================================
-def sync_file_to_db_core():
-    global LAST_SYNC_MTIME
+def _get_username():
+    """Safely extract username from JWT context."""
     try:
-        if not os.path.exists(SNORT_RULES_PATH): return
+        if hasattr(g, 'current_user') and g.current_user:
+            return g.current_user.get('username', 'unknown')
+    except Exception:
+        pass
+    return 'unknown'
 
-        with open(SNORT_RULES_PATH, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
 
-        conn = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASS, database=DB_NAME)
-        cursor = conn.cursor()
+def _get_request_data():
+    """
+    Safely extract request data from JSON body OR query params.
+    Hỗ trợ cả POST body JSON và GET/PUT query params.
+    """
+    data = {}
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+    except Exception:
+        data = {}
+    # Merge query params (query params override body for convenience)
+    try:
+        for key in request.args:
+            val = request.args.get(key)
+            if val is not None:
+                data[key] = val
+    except Exception:
+        pass
+    return data
 
-        for line in lines:
-            line = line.strip()
-            # Bỏ qua dòng trống, comment và luật whitelist tự sinh
-            if not line or line.startswith('#') or line.startswith('pass ip'):
-                continue
-
-            # Bóc tách SID và Message bằng Regex
-            sid_match = re.search(r'sid\s*:\s*(\d+)\s*;', line, re.IGNORECASE)
-            msg_match = re.search(r'msg\s*:\s*"([^"]+)"\s*;', line, re.IGNORECASE)
-
-            if sid_match and msg_match:
-                sid = int(sid_match.group(1))
-                msg = msg_match.group(1)
-                
-                # Chỉ đồng bộ các SID dành cho Custom Rules (>= 1000000)
-                if sid < 1000000: continue
-
-                # Bóc tách Action (alert/drop) và Protocol (tcp/udp/icmp/ip)
-                parts = line.split()
-                action = parts[0].upper() if len(parts) > 0 else 'ALERT'
-                protocol = parts[1].lower() if len(parts) > 1 else 'tcp'
-
-                # Ghi đè hoặc thêm mới vào Database
-                sql = f"""
-                    INSERT INTO {DB_TABLE} (sid, rev, action, protocol, msg, raw_rule, source) 
-                    VALUES (%s, 1, %s, %s, %s, %s, 'local_custom')
-                    ON DUPLICATE KEY UPDATE 
-                    action=VALUES(action), protocol=VALUES(protocol), msg=VALUES(msg), raw_rule=VALUES(raw_rule)
-                """
-                cursor.execute(sql, (sid, action, protocol, msg, line))
-
-        conn.commit()
-        conn.close()
-        logger.info("🔄 [TWO-WAY SYNC] Đã đồng bộ ngược từ File local.rules lên Website thành công!")
-        
-        # Cập nhật mtime để vòng lặp tiếp theo không quét lại chính nó
-        LAST_SYNC_MTIME = os.stat(SNORT_RULES_PATH).st_mtime
-        
-    except Exception as e:
-        logger.error(f"❌ Lỗi khi đồng bộ File -> Database: {e}")
-
-def file_watcher_worker():
-    global LAST_SYNC_MTIME
-    while True:
-        time.sleep(3) # Quét 3 giây 1 lần
-        try:
-            if os.path.exists(SNORT_RULES_PATH):
-                current_mtime = os.stat(SNORT_RULES_PATH).st_mtime
-                if LAST_SYNC_MTIME == 0:
-                    LAST_SYNC_MTIME = current_mtime # Khởi tạo lần đầu
-                elif current_mtime != LAST_SYNC_MTIME:
-                    logger.info("👀 Phát hiện thay đổi thủ công trong local.rules. Tiến hành đồng bộ...")
-                    time.sleep(1) # Đợi người dùng Save file hoàn tất
-                    sync_file_to_db_core()
-                    LAST_SYNC_MTIME = os.stat(SNORT_RULES_PATH).st_mtime
-        except Exception: pass
-
-# Khởi chạy tiểu trình giám sát ngầm
-if not WATCHER_STARTED:
-    threading.Thread(target=file_watcher_worker, daemon=True).start()
-    WATCHER_STARTED = True
 
 # ========================================================================
-# CÁC HÀM XỬ LÝ LÕI (GIỮ NGUYÊN)
+# GET /api/rules — Read all rules
 # ========================================================================
-def get_whitelist_from_env():
-    paths = ['/home/bk_ids/bk-ids/.env', '/app/.env', '.env']
-    for path in paths:
-        if os.path.exists(path):
-            with open(path, 'r') as f:
-                for line in f:
-                    if line.strip().startswith("WHITELIST_IPS="):
-                        ips = line.split('=', 1)[1].strip().strip('"\'').split(',')
-                        return [ip.strip() for ip in ips if ip.strip()]
-    return ["192.168.142.1"]
-
-def sanitize_name(text):
-    if not text: return "Unknown Threat"
-    return re.sub(r'[^\w\s\-]', '', str(text)).strip()
-
-def sanitize_pattern(text):
-    if not text: return ""
-    text = str(text)
-    if "->" in text and "msg:" in text: return text.strip()
-    text = text.replace('"', '\\"')
-    return text.strip()
-
-def trigger_system_reload():
-    try:
-        subprocess.run(["pkill", "-TERM", "-f", "snort"], check=False)
-        logger.info("🔄 Đã gửi lệnh Hot-Reload tới Lõi Snort 3.")
-    except Exception as e:
-        logger.warning(f"Không thể gửi tín hiệu nạp lại tới Snort: {e}")
-
-def generate_snort_rules_from_db():
-    global LAST_SYNC_MTIME
-    try:
-        conn = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASS, database=DB_NAME, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT raw_rule FROM {DB_TABLE} WHERE source='local_custom' ORDER BY id ASC")
-        db_rules = cursor.fetchall()
-        conn.close()
-
-        snort_lines = [
-            "# ==================================================================",
-            "# BK-IDS SOC: TỆP LUẬT SNORT 3 (LOCAL RULES)",
-            "# ĐÃ KÍCH HOẠT ĐỒNG BỘ 2 CHIỀU (FILE <-> DATABASE)",
-            "# ==================================================================\n"
-        ]
-        
-        whitelist_ips = get_whitelist_from_env()
-        pass_sid = 100000
-        snort_lines.append("# --- KIM BÀI MIỄN TỬ (WHITELIST TỪ .ENV) ---")
-        for ip in whitelist_ips:
-            snort_lines.append(f"pass ip {ip} any <> any any (msg:\"Bypass Whitelist IP {ip}\"; sid:{pass_sid}; rev:1;)")
-            pass_sid += 1
-        snort_lines.append("# -------------------------------------------\n")
-
-        for r in db_rules:
-            if r['raw_rule']:
-                clean_rule = r['raw_rule'].replace('\\"', '"').replace('\\;', ';')
-                snort_lines.append(clean_rule)
-
-        os.makedirs(os.path.dirname(SNORT_RULES_PATH), exist_ok=True)
-        with open(SNORT_RULES_PATH, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(snort_lines))
-            f.flush()
-            os.fsync(f.fileno()) 
-            
-        # 🎯 CHỐNG LOOP: Cập nhật MTIME ngay sau khi Web ghi đè để Thread không kéo ngược lại
-        LAST_SYNC_MTIME = os.stat(SNORT_RULES_PATH).st_mtime
-            
-    except Exception as e:
-        logger.error(f"Lỗi khi xuất file local.rules: {e}")
-
 def get_rules():
+    """GET /api/rules — Query params: category, action, protocol, enabled"""
     try:
-        conn = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASS, database=DB_NAME, cursorclass=pymysql.cursors.DictCursor)
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT action, protocol, dst_port, msg, raw_rule, source FROM {DB_TABLE} ORDER BY id DESC")
-        db_rules = cursor.fetchall()
-        conn.close()
-
-        formatted_rules = []
-        for r in db_rules:
-            is_local_flag = True if r.get('source') == 'local_custom' else False
-            clean_pattern = r['raw_rule'].replace('\\"', '"').replace('\\;', ';') if r['raw_rule'] else ""
-
-            formatted_rules.append({
-                "action": r['action'],
-                "protocol": r['protocol'],
-                "dst_port": r['dst_port'] if r['dst_port'] else "any",
-                "name": r['msg'],
-                "pattern": clean_pattern,
-                "is_local": is_local_flag
-            })
-        return jsonify({'status': 'success', 'data': formatted_rules}), 200
+        result = get_all_rules(
+            category=request.args.get('category', '').strip().lower() or None,
+            action=request.args.get('action', '').strip().upper() or None,
+            protocol=request.args.get('protocol', '').strip().lower() or None,
+            enabled=request.args.get('enabled', '').strip().lower() == 'true' if request.args.get('enabled') else None,
+        )
+        return jsonify({
+            'status': 'success',
+            'data': result['rules'],
+            'count': result['count'],
+            'stats': result['stats']
+        }), 200
     except Exception as e:
-        logger.error(f"Lỗi đọc Database MySQL: {e}")
-        if os.path.exists(RULE_JSON_PATH):
-            with open(RULE_JSON_PATH, 'r', encoding='utf-8') as f:
-                rules = json.load(f)
-            return jsonify({'status': 'success', 'data': rules, 'warning': 'Lỗi DB, đang dùng file tĩnh'}), 200
-        return jsonify({'status': 'error', 'message': f"Lỗi đọc DB: {str(e)}"}), 500
+        logger.error(f"[RULES] get_rules error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Lỗi đọc luật: {str(e)}'}), 200
 
-def save_rules():
+
+# ========================================================================
+# POST /api/rules — Save/Update rules (batch mode: {rules: [...], mode: replace|append})
+# ========================================================================
+def save_rules_endpoint():
+    """POST /api/rules — Body: {rules: [...], mode: 'replace'|'append'}"""
     try:
-        data = request.get_json()
-        if not data or 'rules' not in data:
-            return jsonify({'status': 'error', 'message': 'Dữ liệu luật không hợp lệ.'}), 400
-            
-        rules = data.get('rules', [])
-        
-        os.makedirs(os.path.dirname(RULE_JSON_PATH), exist_ok=True)
-        with open(RULE_JSON_PATH, 'w', encoding='utf-8') as f:
-            json.dump(rules, f, indent=4, ensure_ascii=False)
-            
+        data = _get_request_data()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'Body rỗng'}), 400
+
+        result = save_rules(
+            rules_input=data.get('rules', []),
+            mode=data.get('mode', 'replace'),
+            username=_get_username(),
+            ip=request.remote_addr or 'N/A'
+        )
+
+        if result.get('status') == 'error':
+            return jsonify(result), 400 if 'Xác thực' in result.get('message', '') else 200
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.error(f"[RULES] save_rules error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400
+
+
+# ========================================================================
+# POST /api/rules/single — Save/Update a SINGLE rule (frontend format)
+# Nhận format: {action, protocol, source, source_port, destination, dest_port, sid, rev, msg, extra_options, rule_text}
+# ========================================================================
+def save_single_rule_endpoint():
+    """
+    POST /api/rules/single
+    Body: {action, protocol, source, source_port, destination, dest_port, sid, rev, msg, extra_options, rule_text}
+    Hoặc query params: ?action=alert&protocol=tcp&sid=1000001&...
+    """
+    try:
+        data = _get_request_data()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'Body rỗng — cần thông tin luật'}), 400
+
+        # Extract fields from frontend format
+        action = str(data.get('action', 'alert')).strip().lower()
+        protocol = str(data.get('protocol', 'tcp')).strip().lower()
+        source = str(data.get('source', '$HOME_NET')).strip() or '$HOME_NET'
+        source_port = str(data.get('source_port', 'any')).strip() or 'any'
+        destination = str(data.get('destination', '$EXTERNAL_NET')).strip() or '$EXTERNAL_NET'
+        dest_port = str(data.get('dest_port', 'any')).strip() or 'any'
+        direction = str(data.get('direction', '->')).strip() or '->'
+        sid_raw = data.get('sid', 0)
+        rev_raw = data.get('rev', 1)
+        msg = str(data.get('msg', '')).strip()
+        extra_options = str(data.get('extra_options', '')).strip()
+        rule_text = str(data.get('rule_text', '')).strip()
+
+        # Validate SID
         try:
-            conn = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASS, database=DB_NAME)
-            cursor = conn.cursor()
+            sid = int(sid_raw)
+        except (ValueError, TypeError):
+            return jsonify({'status': 'error', 'message': f'SID không hợp lệ: {sid_raw}'}), 400
+        if sid < 1:
+            return jsonify({'status': 'error', 'message': 'SID phải là số nguyên dương'}), 400
 
-            cursor.execute(f"DELETE FROM {DB_TABLE} WHERE source='local_custom'")
-            sid_counter = 1000001
-            
-            for r in rules:
-                raw_action = str(r.get('action', 'ALERT')).upper().strip()
-                action_web = "DROP" if raw_action in ["DROP", "BLOCK", "CHẶN"] else "ALERT"
-                protocol = str(r.get('protocol', 'tcp')).lower()
-                name = sanitize_name(r.get('name'))
-                
-                raw_pattern = r.get('pattern') or r.get('content') or r.get('raw_rule')
-                if not raw_pattern: continue
-                
-                pattern_safe = sanitize_pattern(raw_pattern)
-                
-                if re.search(r'sid\s*:\s*(?!1000\d+)\d+', pattern_safe, re.IGNORECASE):
-                    continue
-                if len(pattern_safe) > 1000:
-                    continue
-                
-                if "->" in pattern_safe and "msg:" in pattern_safe:
-                    raw_rule = pattern_safe
-                    raw_rule = re.sub(r'sid\s*:\s*\d+', f'sid:{sid_counter}', raw_rule, flags=re.IGNORECASE)
-                else:
-                    raw_rule = (
-                        f'{"drop" if action_web == "DROP" else "alert"} '
-                        f'{protocol} any any -> any any '
-                        f'(msg:"[{action_web}] {name}"; '
-                        f'content:"{pattern_safe}",nocase; ' # 🎯 ĐÃ SỬA DẤU PHẨY THÀNH CHẤM PHẨY Ở ĐÂY
-                        f'classtype:web-application-attack; '
-                        f'sid:{sid_counter}; rev:5;)'
-                    )
-                
-                sql = f"""
-                    INSERT INTO {DB_TABLE} (sid, rev, action, protocol, msg, raw_rule, source) 
-                    VALUES (%s, 5, %s, %s, %s, %s, 'local_custom')
-                    ON DUPLICATE KEY UPDATE 
-                    action=VALUES(action), protocol=VALUES(protocol), msg=VALUES(msg), raw_rule=VALUES(raw_rule), source=VALUES(source)
-                """
-                cursor.execute(sql, (sid_counter, action_web, protocol, name, raw_rule))
-                sid_counter += 1
-                
-            conn.commit()
-            conn.close()
-        except Exception as db_e:
-            logger.error(f"Lỗi khi lưu Database MySQL: {db_e}")
-            return jsonify({'status': 'error', 'message': f"Lỗi Database: {str(db_e)}"}), 500
+        # Validate Rev
+        try:
+            rev = int(rev_raw) if rev_raw is not None else 1
+        except (ValueError, TypeError):
+            rev = 1
 
-        generate_snort_rules_from_db()
-        trigger_system_reload()
-        
-        return jsonify({'status': 'success', 'message': 'Đã lưu luật và cấp Kim bài miễn tử thành công!'}), 200
+        # Validate msg
+        if not msg:
+            return jsonify({'status': 'error', 'message': 'Message (msg) là bắt buộc'}), 400
+        if len(msg) < 3:
+            return jsonify({'status': 'error', 'message': 'Message quá ngắn (tối thiểu 3 ký tự)'}), 400
+        if len(msg) > 255:
+            msg = msg[:255]
+
+        # Build Snort 3 rule line
+        if rule_text:
+            # Use provided rule_text but ensure it has correct SID/Rev
+            # Yêu cầu: Không cho phép xuống dòng, chuẩn 1 dòng 1 luật
+            raw_rule = ' '.join(rule_text.replace('\r', ' ').replace('\n', ' ').split())
+        else:
+            # Build from individual fields
+            # Sanitize: trim whitespace from IP and Port
+            source = ' '.join(source.split())
+            source_port = ' '.join(source_port.split())
+            destination = ' '.join(destination.split())
+            dest_port = ' '.join(dest_port.split())
+
+            # Build options
+            opts = []
+            opts.append(f'msg:"{msg}"')
+            if extra_options:
+                # Clean extra options: ensure each ends with ;
+                for opt_line in extra_options.split('\n'):
+                    opt_line = opt_line.strip()
+                    if opt_line:
+                        if not opt_line.endswith(';'):
+                            opt_line += ';'
+                        opts.append(opt_line)
+            opts.append(f'sid:{sid}')
+            opts.append(f'rev:{rev}')
+
+            raw_rule = f"{action} {protocol} {source} {source_port} {direction} {destination} {dest_port} ({'; '.join(opts)};)"
+            # Clean up double semicolons
+            raw_rule = raw_rule.replace(';;', ';')
+
+        # Check if rule with this SID already exists → update, otherwise create new
+        from core_engine.rule_compiler import get_rule_by_sid
+        existing = get_rule_by_sid(sid)
+
+        if existing:
+            # Update existing rule
+            result = update_rule(
+                sid=sid,
+                fields={
+                    'action': action.upper(),
+                    'protocol': protocol,
+                    'msg': msg,
+                    'raw_rule': raw_rule,
+                    'rev': rev,
+                },
+                username=_get_username(),
+                ip=request.remote_addr or 'N/A'
+            )
+        else:
+            # Create new rule — use save_rules with single rule in append mode
+            result = save_rules(
+                rules_input=[raw_rule],
+                mode='append',
+                username=_get_username(),
+                ip=request.remote_addr or 'N/A'
+            )
+
+        if result.get('status') == 'error':
+            return jsonify(result), 400
+        return jsonify(result), 200
+
     except Exception as e:
-        logger.error(f"Lỗi biên dịch luật: {e}")
-        return jsonify({'status': 'error', 'message': "Lỗi máy chủ khi biên dịch luật."}), 500
+        logger.error(f"[RULES] save_single_rule error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400
 
-def update_rules_online():
-    pass
+
+# ========================================================================
+# PUT /api/rules — Update a single rule
+# ========================================================================
+def update_rule_endpoint():
+    """PUT /api/rules — Body: {sid, action, protocol, msg, ...}"""
+    try:
+        data = _get_request_data()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'Body rỗng'}), 400
+
+        sid = data.get('sid')
+        if not sid:
+            return jsonify({'status': 'error', 'message': 'Thiếu SID'}), 400
+
+        try:
+            sid = int(sid)
+        except (ValueError, TypeError):
+            return jsonify({'status': 'error', 'message': 'SID không hợp lệ'}), 400
+
+        result = update_rule(
+            sid=sid,
+            fields=data,
+            username=_get_username(),
+            ip=request.remote_addr or 'N/A'
+        )
+
+        if result.get('status') == 'error':
+            return jsonify(result), 400 if 'không hợp lệ' in result.get('message', '').lower() else 200
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.error(f"[RULES] update_rule error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400
+
+
+# ========================================================================
+# DELETE /api/rules — Delete a rule by SID
+# ========================================================================
+def delete_rule_endpoint():
+    """DELETE /api/rules — Body: {sid: 1000001} OR query param: ?sid=1000001"""
+    try:
+        data = _get_request_data()
+        sid = data.get('sid')
+
+        if not sid:
+            return jsonify({'status': 'error', 'message': 'Thiếu tham số sid'}), 400
+
+        try:
+            sid = int(sid)
+        except (ValueError, TypeError):
+            return jsonify({'status': 'error', 'message': 'SID không hợp lệ'}), 400
+
+        result = delete_rule(sid=sid, username=_get_username(), ip=request.remote_addr or 'N/A')
+
+        if result.get('status') == 'error':
+            return jsonify(result), 200
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.error(f"[RULES] delete_rule error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400
+
+
+# ========================================================================
+# PATCH /api/rules/toggle — Enable/Disable a rule
+# ========================================================================
+def toggle_rule_endpoint():
+    """
+    PATCH /api/rules/toggle — Body: {sid: 1000001, enabled: true}
+    Hoặc query params: ?sid=1000001&enabled=true
+    """
+    try:
+        data = _get_request_data()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'Body rỗng'}), 400
+
+        sid = data.get('sid')
+        enabled = data.get('enabled')
+
+        if not sid:
+            return jsonify({'status': 'error', 'message': 'Thiếu tham số sid'}), 400
+        if enabled is None:
+            return jsonify({'status': 'error', 'message': 'Thiếu tham số enabled (true/false)'}), 400
+
+        try:
+            sid = int(sid)
+        except (ValueError, TypeError):
+            return jsonify({'status': 'error', 'message': 'SID không hợp lệ'}), 400
+
+        # Handle enabled as string or bool
+        if isinstance(enabled, str):
+            enabled = enabled.lower() in ('true', '1', 'yes', 'on')
+        else:
+            enabled = bool(enabled)
+
+        result = toggle_rule(sid=sid, enabled=enabled, username=_get_username(), ip=request.remote_addr or 'N/A')
+
+        if result.get('status') == 'error':
+            return jsonify(result), 200
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.error(f"[RULES] toggle_rule error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400
+
+
+# ========================================================================
+# POST /api/rules/validate — Validate without saving
+# ========================================================================
+def validate_rules_endpoint():
+    """POST /api/rules/validate — Body: {rules: [...]}"""
+    try:
+        data = _get_request_data()
+        rules_input = data.get('rules', [])
+
+        if not isinstance(rules_input, list):
+            return jsonify({'status': 'error', 'message': 'rules phải là mảng'}), 400
+
+        result = validate_rules_batch(rules_input)
+
+        return jsonify({
+            'status': 'success',
+            'valid_count': len(result['valid']),
+            'error_count': len(result['errors']),
+            'errors': result['errors'][:50],
+            'is_valid': len(result['errors']) == 0
+        }), 200
+
+    except Exception as e:
+        logger.error(f"[RULES] validate error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400
+
+
+# ========================================================================
+# POST /api/rules/import — Import from raw Snort rules
+# ========================================================================
+def import_rules_endpoint():
+    """POST /api/rules/import — Body: {content: "raw snort rules text", mode: "replace"|"append"}"""
+    try:
+        data = _get_request_data()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'Body rỗng'}), 400
+
+        result = _import_rules(
+            raw_text=data.get('content', ''),
+            mode=data.get('mode', 'append'),
+            category=data.get('category', 'imported').strip()[:50],
+            username=_get_username(),
+            ip=request.remote_addr or 'N/A'
+        )
+
+        if result.get('status') == 'error':
+            return jsonify(result), 400
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.error(f"[RULES] import_rules error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400
+
+
+# ========================================================================
+# GET /api/rules/export — Export rules
+# ========================================================================
+def export_rules_endpoint():
+    """GET /api/rules/export — Query params: format=json|snort|csv, enabled_only=true|false"""
+    try:
+        fmt = request.args.get('format', 'json').strip().lower()
+        enabled_only = request.args.get('enabled_only', 'false').strip().lower() == 'true'
+
+        if fmt not in ('json', 'snort', 'csv'):
+            return jsonify({'status': 'error', 'message': 'Định dạng không hợp lệ. Chọn: json, snort, csv'}), 400
+
+        result = _export_rules(fmt=fmt, enabled_only=enabled_only)
+
+        if fmt == 'snort':
+            return result['content'], 200, {
+                'Content-Type': 'text/plain; charset=utf-8',
+                'Content-Disposition': 'attachment; filename="bkids_rules.conf"'
+            }
+        elif fmt == 'csv':
+            return result['content'], 200, {
+                'Content-Type': 'text/csv; charset=utf-8',
+                'Content-Disposition': 'attachment; filename="bkids_rules.csv"'
+            }
+        else:
+            return jsonify(result), 200
+
+    except Exception as e:
+        logger.error(f"[RULES] export_rules error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400
+
+
+# ========================================================================
+# POST /api/rules/bulk-delete — Delete multiple rules
+# ========================================================================
+def bulk_delete_rules_endpoint():
+    """POST /api/rules/bulk-delete — Body: {sids: [1000001, 1000002, ...]}"""
+    try:
+        data = _get_request_data()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'Body rỗng'}), 400
+
+        sids = data.get('sids', [])
+        if not isinstance(sids, list) or len(sids) == 0:
+            return jsonify({'status': 'error', 'message': 'Mảng SIDs rỗng hoặc không hợp lệ'}), 400
+        if len(sids) > 1000:
+            return jsonify({'status': 'error', 'message': 'Quá nhiều SID (tối đa 1000)'}), 400
+
+        try:
+            sids = [int(s) for s in sids]
+        except (ValueError, TypeError):
+            return jsonify({'status': 'error', 'message': 'Chứa SID không hợp lệ'}), 400
+
+        result = bulk_delete_rules(sids=sids, username=_get_username(), ip=request.remote_addr or 'N/A')
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.error(f"[RULES] bulk_delete error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400
+
+
+# ========================================================================
+# POST /api/rules/bulk-toggle — Toggle multiple rules
+# ========================================================================
+def bulk_toggle_rules_endpoint():
+    """POST /api/rules/bulk-toggle — Body: {sids: [...], enabled: true}"""
+    try:
+        data = _get_request_data()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'Body rỗng'}), 400
+
+        sids = data.get('sids', [])
+        enabled = data.get('enabled')
+
+        if not isinstance(sids, list) or len(sids) == 0:
+            return jsonify({'status': 'error', 'message': 'Mảng SIDs rỗng hoặc không hợp lệ'}), 400
+        if len(sids) > 1000:
+            return jsonify({'status': 'error', 'message': 'Quá nhiều SID (tối đa 1000)'}), 400
+        if enabled is None:
+            return jsonify({'status': 'error', 'message': 'Thiếu tham số enabled'}), 400
+
+        try:
+            sids = [int(s) for s in sids]
+        except (ValueError, TypeError):
+            return jsonify({'status': 'error', 'message': 'Chứa SID không hợp lệ'}), 400
+
+        if isinstance(enabled, str):
+            enabled = enabled.lower() in ('true', '1', 'yes', 'on')
+        else:
+            enabled = bool(enabled)
+
+        result = bulk_toggle_rules(sids=sids, enabled=enabled, username=_get_username(), ip=request.remote_addr or 'N/A')
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.error(f"[RULES] bulk_toggle error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400
+
+
+# ========================================================================
+# GET /api/rules/templates — Get enterprise rule templates
+# ========================================================================
+def get_templates_endpoint():
+    """GET /api/rules/templates"""
+    try:
+        result = get_templates()
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"[RULES] get_templates error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400
+
+
+# ========================================================================
+# GET /api/rules/audit-log — Get rule change audit log
+# ========================================================================
+def get_rules_audit_log():
+    """GET /api/rules/audit-log — Query params: limit=100"""
+    try:
+        limit = request.args.get('limit', 100)
+        try:
+            limit = int(limit)
+        except (ValueError, TypeError):
+            limit = 100
+        limit = min(max(limit, 1), 1000)
+
+        entries = get_audit_log(limit)
+        return jsonify({'status': 'success', 'data': entries, 'count': len(entries)}), 200
+    except Exception as e:
+        logger.error(f"[RULES] get_audit_log error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': f'Backend Exception: {str(e)}'}), 400

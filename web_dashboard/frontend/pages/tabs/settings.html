@@ -1,0 +1,28 @@
+<!-- pages/tabs/settings.html -->
+<section v-show="activeTab === 'settings'" class="view-section">
+    <h5 class="section-title"><i class="fa-solid fa-gear me-2"></i>Cài đặt Hệ thống</h5>
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card-glass">
+                <div class="card-header card-header-dark"><h5 class="mb-0"><i class="fa-solid fa-server me-2" style="color:var(--accent-cyan)"></i>Cấu hình API</h5></div>
+                <div class="card-body">
+                    <div class="mb-3"><label class="form-label text-muted" style="font-size:.75rem">Địa chỉ API</label><input type="text" class="form-dark form-control form-control-sm" :value="apiBaseUrl" readonly></div>
+                    <div class="mb-3"><label class="form-label text-muted" style="font-size:.75rem">Xác thực</label><div><span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Đã xác thực</span></div></div>
+                    <div class="mb-0"><label class="form-label text-muted" style="font-size:.75rem">Người dùng</label><div><span class="fw-bold">{{ userName }}</span> <span class="badge" style="background:rgba(239,68,68,.15);color:#fca5a5">Quản trị viên</span></div></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card-glass">
+                <div class="card-header card-header-dark"><h5 class="mb-0"><i class="fa-solid fa-shield-halved me-2" style="color:var(--accent-green)"></i>Bảo mật</h5></div>
+                <div class="card-body">
+                    <p class="text-muted" style="font-size:.82rem">Chính sách CSP: <span style="color:var(--accent-green)">Nghiêm ngặt</span></p>
+                    <p class="text-muted" style="font-size:.82rem">Token xác thực: <span style="color:var(--accent-cyan)">Bearer JWT</span></p>
+                    <p class="text-muted" style="font-size:.82rem">Lưu phiên: <span style="color:var(--accent-yellow)">sessionStorage</span></p>
+                    <hr style="border-color:var(--border)">
+                    <button class="btn btn-outline-danger btn-sm" @click="logout"><i class="fa-solid fa-right-from-bracket me-2"></i>Đăng xuất</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

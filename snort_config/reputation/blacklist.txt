@@ -1,0 +1,17 @@
+# BK-IDS SOC: Snort 3 Reputation Blacklist
+# Format: one IP or CIDR per line. Lines starting with # are comments.
+# Managed independently from Snort rule signatures.
+# Reload: Snort 3 auto-reloads this file on change (no restart needed).
+#
+# Sources: AbuseIPDB, AlienVault OTX, custom threat intel feeds
+# Last updated: 2025-01-01
+
+# === C2 / Botnet known bad actors ===
+185.220.101.34
+103.224.182.250
+
+# === Scanner networks ===
+45.33.32.156/32
+
+# === Known malicious ranges (example) ===
+# 10.0.0.0/8    # RFC1918 - should never appear in real blacklist

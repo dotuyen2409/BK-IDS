@@ -1,19 +1,34 @@
-# /home/bk_ids/bk-ids/Dockerfile.api
+# Dockerfile.api — BK-IDS NGIPS Control Plane
+# Phase 2/3: Flask API + LogWatchdog + SOAR Engine
+# Fix: Force IPv4 for apt to avoid IPv6 connectivity failures in lab env
 
 FROM python:3.10-slim
 
-# Bổ sung các công cụ mạng lõi và procps (chứa lệnh pkill)
-RUN apt-get update && apt-get install -y \
-    gcc \
-    python3-dev \
+# Force apt to use IPv4 only — fixes lab environments where IPv6 is unreachable
+RUN echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99force-ipv4
+
+# Install only essential runtime binaries (no build tools needed)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    iptables \
     iputils-ping \
     net-tools \
     procps \
+    iproute2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir flask flask-cors mysql-connector-python requests psutil python-dotenv pymysql
+# Install Python dependencies — pinned for reproducibility
+RUN pip install --no-cache-dir \
+    flask==3.0.3 \
+    flask-cors==4.0.1 \
+    PyJWT==2.8.0 \
+    pymysql==1.1.1 \
+    redis==5.0.8 \
+    requests==2.32.3 \
+    psutil==6.0.0 \
+    python-dotenv==1.0.1 \
+    cryptography==43.0.0
 
 EXPOSE 5000
 

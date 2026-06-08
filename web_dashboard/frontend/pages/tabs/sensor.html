@@ -1,0 +1,51 @@
+<!-- pages/tabs/sensor.html -->
+<section v-show="activeTab === 'sensor'" class="view-section">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div><h2 style="margin:0;font-weight:600">Phát hiện Bất thường — CUSUM Engine</h2><p class="text-muted mb-0" style="font-size:.85rem">Tính toán Entropy phân tán IP, nhận diện rà quét mạng & DDoS.</p></div>
+        <div class="d-flex gap-2"><span class="status-dot status-dot--online">SNORT 3: ĐỒNG BỘ</span><span class="status-dot" :class="sensorConnected ? 'status-dot--online' : 'status-dot--offline'">{{ sensorConnected ? 'CUSUM: TRỰC TUYẾN' : 'CUSUM: NGOẠI TUYẾN' }}</span></div>
+    </div>
+    <div class="card-glass p-3 mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3"><span class="text-muted" style="font-size:.85rem;font-weight:600">CHẾ ĐỘ:</span><div class="btn-group"><button class="btn btn-sm" :class="sensorMode === 'live' ? 'btn-info' : 'btn-outline-secondary'" @click="setSensorMode('live')">🔴 Trực tiếp</button><button class="btn btn-sm" :class="sensorMode === 'history' ? 'btn-info' : 'btn-outline-secondary'" @click="setSensorMode('history')">📅 Lịch sử</button></div></div>
+            <div v-if="sensorMode === 'history'" class="d-flex gap-2"><input type="date" v-model="sensorDate" class="form-dark form-control form-control-sm" style="width:150px"><button class="btn btn-outline-info btn-sm" @click="fetchSensorData">Truy xuất</button></div>
+        </div>
+    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-md-4"><div class="card-glass health-card health-card--critical"><div class="health-card__label">Cảnh báo Vượt Ngưỡng</div><div class="health-card__value">{{ sensorAlerts }}</div></div></div>
+        <div class="col-md-4"><div class="card-glass health-card health-card--warning"><div class="health-card__label">Ngưỡng An toàn (H)</div><div class="health-card__value" style="color:var(--accent-yellow)">{{ sensorThreshold }}</div></div></div>
+        <div class="col-md-4"><div class="card-glass health-card" :class="sensorAnomaly ? 'health-card--critical' : 'health-card--healthy'"><div class="health-card__label">Trạng thái Mạng</div><div class="health-card__value" :style="{ color: sensorAnomaly ? 'var(--accent-red)' : 'var(--accent-cyan)' }">{{ sensorAnomaly ? 'BẤT THƯỜNG' : 'BÌNH THƯỜNG' }}</div></div></div>
+    </div>
+    <div class="card-glass mb-4" :style="{ borderLeft: blockedIPs.length > 0 ? '4px solid var(--accent-red)' : '4px solid var(--accent-green)' }">
+        <h5 class="mb-3" :style="{ color: blockedIPs.length > 0 ? 'var(--accent-red)' : 'var(--accent-green)' }">🛡️ TƯỜNG LỬA SOAR-IPS: DANH SÁCH BỊ PHONG TỎA</h5>
+        <div v-if="blockedIPs.length > 0" class="d-flex flex-wrap gap-3">
+            <div v-for="item in blockedIPs" :key="item.ip" class="d-flex align-items-center gap-3 p-2 rounded" style="background:var(--bg-base);border:1px solid rgba(239,68,68,.3)"><span class="mono" style="color:#fca5a5;font-weight:700">🛑 {{ item.ip }}</span><button class="btn btn-sm btn-outline-success" @click="unblockSensorIP(item.ip)">🔓 Gỡ Chặn</button></div>
+        </div>
+        <div v-else class="text-muted">Hệ thống Tường lửa hiện đang trống.</div>
+    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+            <div class="card-glass border-glow-cyan">
+                <h5 class="mb-3"><i class="fa-solid fa-network-wired text-cyan me-2"></i> Lưu lượng Mạng (TCP/UDP/ICMP) Real-time</h5>
+                <div style="height:220px"><canvas id="sensorTrafficChart"></canvas></div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card-glass border-glow-warning">
+                <h5 class="mb-3"><i class="fa-solid fa-wave-square text-warning me-2"></i> Dao động CuSUM / Ngưỡng (H)</h5>
+                <div style="height:220px"><canvas id="sensorCusumChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+    <div class="card-glass mb-5">
+        <h5 class="mb-3">Nhật ký Đánh giá An ninh & Bất thường</h5>
+        <div style="max-height:400px;overflow-y:auto">
+            <table class="table table-dark-custom table-hover mb-0">
+                <thead><tr><th>Thời gian</th><th>Top IP Nguồn</th><th>Tổng Gói</th><th>Entropy</th><th>Ngưỡng (H)</th><th>CuSUM (Gn)</th><th>Loại tấn công</th><th>Đánh giá</th></tr></thead>
+                <tbody>
+                    <tr v-for="(item, idx) in sensorTableData" :key="idx" :style="{ background: item.is_anomaly ? 'rgba(239,68,68,.08)' : 'transparent' }"><td class="mono text-muted" style="font-size:.75rem">{{ item.tg_ketthuc }}</td><td class="mono fw-bold" :style="{ color: item.is_anomaly ? '#fca5a5' : 'var(--text-primary)' }">{{ item.top_ip }}</td><td class="mono" style="color:var(--accent-cyan)">{{ item.tong_goi }}</td><td class="mono" style="color:var(--accent-purple)">{{ item.entropi }}</td><td class="mono" style="color:var(--accent-yellow)">{{ item.h_threshold }}</td><td class="mono fw-bold" :style="{ color: item.is_anomaly ? 'var(--accent-red)' : 'var(--text-primary)' }">{{ item.gn }}</td><td><span v-if="item.attack_type && item.attack_type !== 'BÌNH THƯỜNG'" class="badge" style="background:rgba(239,68,68,.2);color:#fca5a5;font-size:.7rem;font-weight:500">{{ item.attack_type }}</span><span v-else class="text-muted" style="font-size:.75rem">—</span></td><td><span class="severity-badge" :class="item.is_anomaly ? 'sev-critical' : 'sev-low'">{{ item.is_anomaly ? 'BẤT THƯỜNG' : 'BÌNH THƯỜNG' }}</span></td></tr>
+                    <tr v-if="sensorTableData.length === 0"><td colspan="8" class="text-center py-5 text-muted">{{ sensorConnected ? 'Đang thu thập dữ liệu...' : 'Mất kết nối API CuSUM!' }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,9 @@
+# BK-IDS NGIPS: Reputation Whitelist
+# ============================================================
+# Format: one IPv4 address or CIDR per line.
+# Whitelist ALWAYS overrides blacklist (priority = whitelist in snort.lua).
+# Add trusted internal/admin IPs here to prevent SOAR false-positive blocks.
+# ============================================================
+127.0.0.1
+# 192.168.13.1      # Default gateway — uncomment if needed
+# 192.168.13.128    # SOC admin workstation — uncomment if needed

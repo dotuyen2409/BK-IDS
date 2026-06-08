@@ -1,43 +1,52 @@
-# /home/bk_ids/bk-ids/web_dashboard/backend_api/controllers/alert_controller.py
+# /home/ids/bk_ids/web_dashboard/backend_api/controllers/alert_controller.py
 
 import sys
-import os
 import logging
 import time
+import os
 from datetime import datetime
-import pymysql 
+import pymysql
 
-# ==========================================
-# BỌC THÉP ĐƯỜNG DẪN CỤC BỘ DOCKER
-# ==========================================
 sys.path.append('/app')
-
 from flask import jsonify, request
 from config.database import get_db_connection
 
-# Khởi tạo Logger chuẩn SIEM Doanh nghiệp
 logger = logging.getLogger("Bk-IDS-Alert-Engine")
 
-# ==========================================
-# KHỞI TẠO MODULE ĐO LƯỜNG TÀI NGUYÊN
-# ==========================================
 try:
     import psutil
     PSUTIL_READY = True
     psutil.cpu_percent(interval=None)
 except ImportError:
     PSUTIL_READY = False
-    logger.warning(" CẢNH BÁO: Chưa cài đặt thư viện 'psutil'. Thông số CPU/RAM sẽ mặc định là 0.")
+    logger.warning("PSUTIL not ready")
 
 def _is_db_connected(conn) -> bool:
-    """ Kiểm tra trạng thái kết nối an toàn đa nền tảng """
     if not conn: return False
     if hasattr(conn, 'open'): return conn.open
     if hasattr(conn, 'is_connected'): return conn.is_connected()
     return False
 
+
+def _whitelist_ips():
+    return {
+        ip.strip()
+        for ip in os.environ.get("WHITELIST_IPS", "127.0.0.1,192.168.13.1").split(",")
+        if ip.strip()
+    }
+
+
+def _noise_where(prefix="WHERE"):
+    if os.environ.get("SUPPRESS_WHITELISTED_ALERTS", "true").lower() != "true":
+        return "", []
+    ips = sorted(_whitelist_ips())
+    if not ips:
+        return "", []
+    placeholders = ", ".join(["%s"] * len(ips))
+    return f" {prefix} src_ip NOT IN ({placeholders})", ips
+
 def get_alerts_summary():
-    """ API Endpoint: Lấy tóm tắt sức khỏe Máy chủ Lõi """
+    """ API Endpoint: Lấy tóm tắt alert metrics """
     try:
         if PSUTIL_READY:
             cpu_usage = psutil.cpu_percent(interval=None)
@@ -52,17 +61,29 @@ def get_alerts_summary():
         try:
             db_conn = get_db_connection()
             if _is_db_connected(db_conn):
-                cursor = db_conn.cursor() 
-                cursor.execute("SELECT COUNT(*) AS total FROM misuse_alerts")
-                result = cursor.fetchone()
+                cursor = db_conn.cursor(pymysql.cursors.DictCursor)
+                # Count total alerts from new canonical alerts table
+                noise_where, noise_params = _noise_where()
+                cursor.execute("SELECT COUNT(*) AS total FROM alerts" + noise_where, noise_params)
+                total_result = cursor.fetchone()
+                total_alerts = total_result.get('total', 0) if total_result else 0
                 
-                if isinstance(result, dict):
-                    total_alerts = result.get('total', 0)
-                elif isinstance(result, (tuple, list)):
-                    total_alerts = result[0]
-                    
+                # Get severity counts
+                cursor.execute("SELECT severity, COUNT(*) as count FROM alerts"
+                               + noise_where + " GROUP BY severity", noise_params)
+                severity_counts = {row['severity']: row['count'] for row in cursor.fetchall()}
+                
+                # Get SOAR blocked counts
+                blocked_where = noise_where + (" AND " if noise_where else " WHERE ")
+                cursor.execute("SELECT COUNT(*) as blocked FROM alerts"
+                               + blocked_where + "soar_blocked = 1", noise_params)
+                blocked_result = cursor.fetchone()
+                soar_blocked = blocked_result.get('blocked', 0) if blocked_result else 0
+                
         except Exception as db_err:
-            logger.error(f"Lỗi truy vấn tóm tắt Tường lửa: {db_err}")
+            logger.error(f"DB Error in summary: {db_err}")
+            severity_counts = {}
+            soar_blocked = 0
             
         finally:
             if cursor: cursor.close()
@@ -72,19 +93,21 @@ def get_alerts_summary():
             'status': 'success',
             'data': {
                 'cpu': round(cpu_usage, 1), 
-                'ram': round(ram_usage, 1)
+                'ram': round(ram_usage, 1),
+                'severity_counts': severity_counts,
+                'soar_blocked': soar_blocked
             },
             'total': total_alerts
         }), 200
         
     except Exception as e:
-        logger.error(f"Lỗi hệ thống Alert Controller (Summary): {e}", exc_info=True)
-        return jsonify({'status': 'error', 'message': "Lỗi xử lý máy chủ nội bộ."}), 500
+        logger.error(f"Alert Summary Error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': "Internal error"}), 500
 
 def get_misuse_alerts():
     """
-    🎯 API DOANH NGHIỆP: Truy xuất log Cảnh báo & Máy chém.
-    Đã nâng cấp cơ chế Phòng thủ Chiều sâu (Defensive Programming) chống lỗi Tuple/Dict.
+    API Endpoint for alerts (canonical schema).
+    Compatible with existing frontend pagination.
     """
     start_time = time.time()
     db_conn = None
@@ -92,60 +115,33 @@ def get_misuse_alerts():
     
     try:
         db_conn = get_db_connection()
-        
         if not _is_db_connected(db_conn):
-            logger.error("Mất kết nối tới Container Database")
-            return jsonify({'status': 'error', 'message': "Mất kết nối Database Cảm biến."}), 500
+            return jsonify({'status': 'error', 'message': "DB disconnected"}), 500
             
-        # Cố gắng gọi DictCursor, nhưng phòng hờ driver cũ phớt lờ lệnh này
-        try:
-            cursor = db_conn.cursor(pymysql.cursors.DictCursor)
-        except Exception:
-            cursor = db_conn.cursor()
+        cursor = db_conn.cursor(pymysql.cursors.DictCursor)
         
         limit = request.args.get('limit', default=250, type=int)
         offset = request.args.get('offset', default=0, type=int)
-        
         if limit > 1000: limit = 1000
 
-        # Thứ tự chuẩn: 0:id, 1:timestamp, 2:ip_src, 3:sig_name, 4:protocol, 5:action
+        # Query new canonical `alerts` table
+        noise_where, noise_params = _noise_where()
         sql = """
-            SELECT id, timestamp, ip_src, sig_name, protocol, action 
-            FROM misuse_alerts 
-            ORDER BY timestamp DESC, id DESC 
+            SELECT id, event_time as timestamp, src_ip as ip_src, dst_ip as ip_dst,
+                   signature as sig_name, protocol, action, severity, category, app_id, soar_blocked
+            FROM alerts
+        """ + noise_where + """
+            ORDER BY event_time DESC, id DESC 
             LIMIT %s OFFSET %s
         """
-        cursor.execute(sql, (limit, offset))
+        cursor.execute(sql, noise_params + [limit, offset])
         alerts_raw = cursor.fetchall()
         
-        if not alerts_raw:
-            return jsonify({'status': 'success', 'data': [], 'meta': {'total_returned': 0}}), 200
-            
         formatted_alerts = []
-        
-        # 🎯 BỌC THÉP TẠI ĐÂY: Xử lý an toàn cả Tuple và Dictionary
         for row in alerts_raw:
-            if isinstance(row, (tuple, list)):
-                # Ép kiểu dữ liệu bằng tay nếu Database ngoan cố trả về Tuple
-                alert = {
-                    'id': row[0],
-                    'timestamp': row[1],
-                    'ip_src': row[2],
-                    'sig_name': row[3],
-                    'protocol': row[4],
-                    'action': row[5]
-                }
-            else:
-                # Nếu đã là Dict (chuẩn) thì sao chép
-                alert = dict(row)
-
-            # Chuẩn hóa thời gian
+            alert = dict(row)
             ts = alert.get('timestamp')
-            if isinstance(ts, datetime):
-                alert['timestamp'] = ts.strftime('%Y-%m-%d %H:%M:%S')
-            else:
-                alert['timestamp'] = str(ts) if ts else "Unknown"
-                
+            alert['timestamp'] = ts.strftime('%Y-%m-%d %H:%M:%S') if isinstance(ts, datetime) else str(ts)
             formatted_alerts.append(alert)
 
         execution_time_ms = round((time.time() - start_time) * 1000, 2)
@@ -162,97 +158,51 @@ def get_misuse_alerts():
         }), 200
         
     except Exception as e:
-        logger.error(f"Lỗi truy xuất hệ thống Alerts: {e}", exc_info=True)
-        return jsonify({'status': 'error', 'message': "Lỗi truy xuất hệ thống Tường lửa."}), 500
+        logger.error(f"Alert retrieval error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': "Database error"}), 500
         
     finally:
         if cursor: cursor.close()
         if db_conn and _is_db_connected(db_conn): db_conn.close()
 
-# ==========================================
-# 🟢 MODULE MỚI: TRUY VẤN DANH SÁCH GÓI TIN SOC
-# ==========================================
 def get_recent_alerts():
     """ 
-    Truy vấn 50 cảnh báo/gói tin bất thường gần nhất từ cơ sở dữ liệu BK-IDS (Bảng ids_dulieu)
-    Kết hợp phân tích giao thức và thuật toán CUSUM để tạo thông điệp SOC.
+    API Endpoint for recent high/critical alerts (SOC live feed).
     """
     db_conn = None
     cursor = None
     try:
         db_conn = get_db_connection()
         if not _is_db_connected(db_conn):
-            return jsonify({'status': 'error', 'message': "Mất kết nối Database Cảm biến."}), 500
+            return jsonify({'status': 'error', 'message': "DB disconnected"}), 500
 
-        # Cố gắng gọi DictCursor (Phòng thủ Tuple/Dict)
-        try:
-            cursor = db_conn.cursor(pymysql.cursors.DictCursor)
-        except Exception:
-            cursor = db_conn.cursor()
+        cursor = db_conn.cursor(pymysql.cursors.DictCursor)
         
-        # Truy vấn các bản ghi mới nhất từ bảng dữ liệu IDS
+        noise_where, noise_params = _noise_where()
         sql = """
-            SELECT id, tg_ketthuc as time, top_ip as src_ip, 
-                   soluong_tcp as tcp, soluong_udp as udp, soluong_icmp as icmp,
-                   Gn as gn
-            FROM ids_dulieu 
-            ORDER BY id DESC LIMIT 50
+            SELECT id, event_time as time, src_ip, dst_ip, src_port, dst_port,
+                   protocol, severity, signature as message, category, action, soar_blocked, app_id
+            FROM alerts
+        """ + noise_where + """
+            ORDER BY event_time DESC, id DESC 
+            LIMIT 50
         """
-        cursor.execute(sql)
+        cursor.execute(sql, noise_params)
         rows = cursor.fetchall()
         
         alerts_list = []
-        for row_data in rows:
-            # Xử lý an toàn cả Tuple và Dictionary
-            if isinstance(row_data, (tuple, list)):
-                row = {
-                    'id': row_data[0],
-                    'time': row_data[1],
-                    'src_ip': row_data[2],
-                    'tcp': row_data[3],
-                    'udp': row_data[4],
-                    'icmp': row_data[5],
-                    'gn': row_data[6]
-                }
-            else:
-                row = dict(row_data)
-
-            # Xử lý an toàn định dạng thời gian
-            time_val = row.get('time')
-            time_str = time_val.strftime('%Y-%m-%d %H:%M:%S') if isinstance(time_val, datetime) else str(time_val) if time_val else "Unknown"
-            
-            # Phân tích giao thức chiếm ưu thế
-            counts = {'TCP': int(row.get('tcp') or 0), 'UDP': int(row.get('udp') or 0), 'ICMP': int(row.get('icmp') or 0)}
-            dominant_proto = max(counts, key=counts.get)
-            if sum(counts.values()) == 0:
-                dominant_proto = 'UNKNOWN'
-
-            # Gắn cờ cảnh báo dựa trên chỉ số thuật toán CUSUM (Gn)
-            gn_score = float(row.get('gn') or 0)
-            if gn_score > 5.0:
-                msg = "[CUSUM] Phát hiện Dấu hiệu tấn công DoS/DDoS"
-            elif sum(counts.values()) > 1000:
-                msg = "[Cảnh báo] Lưu lượng mạng gia tăng bất thường"
-            else:
-                msg = "[Snort] Gói tin mạng có cấu trúc không an toàn"
-
-            # Đóng gói kết quả trả về Frontend
-            alerts_list.append({
-                'id': f"#{row['id']}",
-                'time': time_str,
-                'src_ip': row['src_ip'],
-                'src_port': 'Dynamic',    
-                'dst_ip': 'Hệ thống Đích',
-                'dst_port': 'Dynamic',
-                'protocol': dominant_proto,
-                'message': msg
-            })
+        for row in rows:
+            alert = dict(row)
+            time_val = alert.get('time')
+            alert['time'] = time_val.strftime('%Y-%m-%d %H:%M:%S') if isinstance(time_val, datetime) else str(time_val)
+            alert['id'] = f"#{alert['id']}"
+            alerts_list.append(alert)
 
         return jsonify({'status': 'success', 'data': alerts_list}), 200
         
     except Exception as e:
-        logger.error(f"Lỗi truy xuất danh sách cảnh báo (get_recent_alerts): {e}", exc_info=True)
-        return jsonify({'status': 'error', 'message': f"Lỗi CSDL: {str(e)}"}), 500
+        logger.error(f"Recent alerts error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': f"DB error: {str(e)}"}), 500
     finally:
         if cursor: cursor.close()
         if db_conn and _is_db_connected(db_conn): db_conn.close()

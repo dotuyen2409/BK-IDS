@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self' http://192.168.13.129:5050 ws://192.168.13.129:5050 http://192.168.13.129:8080 http://192.168.13.129; base-uri 'self'; form-action 'self'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <title>Phân tích Gói tin — BK-IDS PCAP Forensics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+:root {
+    --bg: #020617;
+    --bg2: #060a18;
+    --surface: #0f172a;
+    --elevated: #1e293b;
+    --border: #334155;
+    --border-subtle: #1e293b;
+    --text: #f8fafc;
+    --text2: #94a3b8;
+    --muted: #475569;
+    --cyan: #06b6d4;
+    --cyan-dim: rgba(6,182,212,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --green: #10b981;
+    --green-dim: rgba(16,185,129,0.12);
+    --yellow: #f59e0b;
+    --yellow-dim: rgba(245,158,11,0.12);
+    --purple: #a855f7;
+    --orange: #f97316;
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.12);
+    --glass-bg: rgba(15,23,42,0.65);
+    --glass-border: rgba(255,255,255,0.08);
+    --glass-highlight: rgba(6,182,212,0.05);
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow: hidden;
+    font-size: 13px;
+}
+
+/* === TOP BAR === */
+.top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.top-bar-left { display: flex; align-items: center; gap: 16px; }
+.top-bar-right { display: flex; align-items: center; gap: 12px; }
+.back-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--cyan); text-decoration: none; font-size: 0.82rem; font-weight: 500;
+    padding: 6px 12px; border-radius: 6px; border: 1px solid transparent;
+    transition: all 0.2s;
+}
+.back-btn:hover { background: var(--cyan-dim); border-color: var(--cyan); }
+.top-title { font-size: 0.95rem; font-weight: 700; color: var(--text); letter-spacing: 0.3px; }
+.top-sub { font-size: 0.72rem; color: var(--muted); margin-left: 8px; font-family: 'JetBrains Mono', monospace; }
+
+/* === PANE 1: GLASSMORPHISM HEADER CARDS === */
+.header-pane {
+    flex-shrink: 0;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    overflow-x: auto;
+}
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    max-width: 1400px;
+}
+.glass-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+    transition: border-color 0.2s;
+}
+.glass-card:hover { border-color: rgba(6,182,212,0.2); }
+.glass-card-header {
+    padding: 8px 14px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--glass-border);
+    display: flex; align-items: center; gap: 6px;
+}
+.glass-card-body { padding: 10px 14px; }
+.glass-card-body .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text);
+    word-break: break-all;
+}
+.glass-card-body .value.cyan { color: var(--cyan); }
+.glass-card-body .value.red { color: var(--red); }
+.glass-card-body .value.green { color: var(--green); }
+.glass-card-body .value.yellow { color: var(--yellow); }
+.glass-card-body .sub {
+    font-size: 0.68rem;
+    color: var(--muted);
+    margin-top: 3px;
+}
+
+.proto-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+}
+.proto-tcp { background: var(--blue-dim); color: #93c5fd; }
+.proto-udp { background: rgba(168,85,247,0.15); color: #c084fc; }
+.proto-icmp { background: var(--yellow-dim); color: #fbbf24; }
+.proto-other { background: rgba(148,163,184,0.12); color: #94a3b8; }
+
+/* === THREE-PANE LAYOUT === */
+.three-pane-container {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* === GENERIC PANE === */
+.pane {
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+.pane:last-child { border-right: none; }
+.pane-header {
+    flex-shrink: 0;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.72rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text2);
+    display: flex; align-items: center; justify-content: space-between;
+}
+.pane-body {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+/* === PANE 2: TREE VIEW (OSI Layers) === */
+.tree-section { border-bottom: 1px solid var(--border-subtle); }
+.tree-section:last-child { border-bottom: none; }
+.tree-section-header {
+    padding: 10px 16px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 0.78rem; font-weight: 600;
+    user-select: none;
+    transition: background 0.15s;
+    background: var(--surface);
+}
+.tree-section-header:hover { background: var(--elevated); }
+.tree-section-header .layer-icon {
+    width: 20px; height: 20px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem; flex-shrink: 0;
+}
+.tree-section-header .layer-name { flex: 1; }
+.tree-section-header .layer-count {
+    font-size: 0.65rem; color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+}
+.tree-toggle {
+    color: var(--muted); font-size: 0.7rem;
+    transition: transform 0.2s ease;
+}
+.tree-toggle.open { transform: rotate(90deg); }
+.tree-section-body {
+    display: none;
+    padding: 12px 16px 14px 46px;
+    background: var(--bg);
+}
+.tree-section-body.open { display: block; }
+
+.field-row {
+    display: flex;
+    padding: 5px 0;
+    font-size: 0.74rem;
+    border-bottom: 1px solid rgba(51,65,85,0.2);
+    line-height: 1.4;
+}
+.field-row:last-child { border-bottom: none; }
+.field-key {
+    color: var(--text2);
+    font-weight: 500;
+    min-width: 140px;
+    flex-shrink: 0;
+}
+.field-val {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text);
+    word-break: break-all;
+    flex: 1;
+}
+.field-val.highlight { color: var(--cyan); }
+.field-val.flag-on { color: var(--red); }
+
+/* TCP Flags */
+.flag-chips { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.flag-chip {
+    padding: 1px 6px; border-radius: 3px;
+    font-size: 0.6rem; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+}
+.flag-chip.on { background: var(--red-dim); color: #fca5a5; }
+.flag-chip.off { background: rgba(30,41,59,0.5); color: var(--muted); }
+
+/* === PANE 3: HEX/ASCII DUMP === */
+.hex-toolbar {
+    flex-shrink: 0;
+    display: flex; gap: 6px; padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    align-items: center;
+}
+.hex-toolbar-btn {
+    padding: 4px 10px;
+    background: transparent; border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text2);
+    font-size: 0.65rem; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+    font-family: 'Inter', sans-serif;
+}
+.hex-toolbar-btn:hover { border-color: var(--cyan); color: var(--text); }
+.hex-toolbar-btn.active { background: var(--cyan-dim); border-color: var(--cyan); color: var(--cyan); }
+.hex-info { font-size: 0.65rem; color: var(--muted); margin-left: auto; font-family: 'JetBrains Mono', monospace; }
+
+.hex-container {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    padding: 8px 0;
+    overflow: auto;
+    flex: 1;
+    min-height: 0;
+}
+.hex-row {
+    display: flex;
+    padding: 1px 16px;
+    white-space: pre;
+    transition: background 0.1s;
+}
+.hex-row:hover { background: rgba(6,182,212,0.04); }
+.hex-offset {
+    color: var(--muted);
+    width: 60px;
+    flex-shrink: 0;
+    user-select: none;
+}
+.hex-bytes {
+    color: var(--cyan);
+    flex: 1;
+    letter-spacing: 0.3px;
+    font-feature-settings: 'tnum' 1;
+}
+.hex-ascii {
+    color: var(--green);
+    width: 140px;
+    flex-shrink: 0;
+    text-align: left;
+    letter-spacing: 0.3px;
+    font-feature-settings: 'tnum' 1;
+}
+
+/* === LOADING / ERROR / EMPTY STATES === */
+.state-overlay {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 100%; padding: 40px;
+}
+.state-spinner {
+    width: 32px; height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--cyan);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-bottom: 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.state-text { font-size: 0.85rem; color: var(--text2); }
+.state-error {
+    background: var(--red-dim);
+    border: 1px solid rgba(239,68,68,0.25);
+    border-radius: 8px; padding: 14px 18px;
+    color: #fca5a5; font-size: 0.82rem;
+    display: flex; align-items: center; gap: 10px;
+    max-width: 500px; margin: 0 20px;
+}
+.state-empty {
+    text-align: center; color: var(--muted);
+    font-size: 0.85rem; padding: 40px;
+}
+
+/* === SEVERITY BAR (inside header) === */
+.severity-bar {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 100px;
+    font-size: 0.62rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.sev-critical { background: var(--red-dim); color: #fca5a5; border: 1px solid rgba(239,68,68,0.25); }
+.sev-warning { background: var(--yellow-dim); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+.sev-low { background: var(--green-dim); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.25); }
+.sev-info { background: var(--cyan-dim); color: #67e8f9; border: 1px solid rgba(6,182,212,0.25); }
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<div style="display:flex;flex-direction:column;height:100vh;">
+
+<!-- ===== TOP BAR ===== -->
+<div class="top-bar">
+    <div class="top-bar-left">
+        <a href="/packet-list.html" class="back-btn" id="btn-back">
+            <i class="fa-solid fa-arrow-left"></i> Quay lại
+        </a>
+        <span class="top-title">Phân tích Gói tin Mạng</span>
+        <span class="top-sub" id="page-sub">Đang tải...</span>
+    </div>
+    <div class="top-bar-right">
+        <span id="sev-badge" class="severity-bar sev-info" style="display:none;"></span>
+    </div>
+</div>
+
+<!-- ===== PANE 1: GLASSMORPHISM HEADER CARDS ===== -->
+<div class="header-pane" id="pane-header" style="display:none;">
+    <div class="summary-grid" id="summary-grid">
+        <!-- Filled by JS -->
+    </div>
+</div>
+
+<!-- ===== THREE-PANE LAYOUT ===== -->
+<div class="three-pane-container" id="pane-3col" style="display:none;">
+
+    <!-- PANE 2: OSI Layer Tree -->
+    <div class="pane" style="flex: 0 0 340px; min-width: 280px;">
+        <div class="pane-header">
+            <span><i class="fa-solid fa-layer-group" style="margin-right:6px;color:var(--cyan);"></i>Lớp mạng OSI</span>
+            <span style="font-size:0.65rem;color:var(--muted);" id="layer-count-badge"></span>
+        </div>
+        <div class="pane-body" id="tree-view">
+            <!-- Filled by JS -->
+        </div>
+    </div>
+
+    <!-- PANE 3: Hex/ASCII Dump -->
+    <div class="pane" style="flex: 1;">
+        <div class="pane-header">
+            <span><i class="fa-solid fa-code" style="margin-right:6px;color:var(--green);"></i>Hex / ASCII Dump</span>
+            <span class="badge bg-success ms-2"><i class="fa-solid fa-microchip me-1"></i> Client-side Decoding</span>
+            <span style="font-size:0.65rem;color:var(--muted);margin-left:auto" id="hex-count-badge"></span>
+        </div>
+        <div class="hex-toolbar">
+            <button class="hex-toolbar-btn active" id="btn-hex-view" onclick="switchHexView('hex')">Hex</button>
+            <button class="hex-toolbar-btn" id="btn-ascii-view" onclick="switchHexView('ascii')">ASCII</button>
+            <button class="hex-toolbar-btn" id="btn-both-view" onclick="switchHexView('both')">Hex + ASCII</button>
+            <span class="hex-info" id="hex-info-text"></span>
+        </div>
+        <div class="hex-container" id="hex-container">
+            <!-- Filled by JS -->
+        </div>
+    </div>
+</div>
+
+<!-- ===== LOADING STATE ===== -->
+<div id="state-loading" class="state-overlay">
+    <div class="state-spinner"></div>
+    <div class="state-text">Đang phân tích gói tin mạng...</div>
+</div>
+
+<!-- ===== ERROR STATE ===== -->
+<div id="state-error" class="state-overlay" style="display:none;">
+    <div class="state-error" id="error-box">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="error-text"></span>
+    </div>
+</div>
+
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="/js/services/api.js"></script>
+<script>
+(function(){
+    'use strict';
+
+    // === AUTH: Multi-source token read ===
+    function getAuthToken() {
+        // Try TokenManager first (from sessionStorage via api.js)
+        if (typeof TokenManager !== 'undefined' && TokenManager.getAccessToken) {
+            var t = TokenManager.getAccessToken();
+            if (t) return t;
+        }
+        // Fallback: sessionStorage direct
+        var s = sessionStorage.getItem('bk_ids_token');
+        if (s) return s;
+        // Fallback: localStorage
+        var l = localStorage.getItem('bk_ids_token');
+        if (l) return l;
+        // Last resort: try other common keys
+        l = localStorage.getItem('jwt_token');
+        if (l) return l;
+        l = localStorage.getItem('auth_token');
+        if (l) return l;
+        l = localStorage.getItem('token');
+        if (l) return l;
+        return null;
+    }
+
+    // === AUTH GUARD ===
+    var token = getAuthToken();
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
+    // Ensure TokenManager is synced (so api.js request() picks up the token)
+    if (typeof TokenManager !== 'undefined' && TokenManager.setTokens) {
+        TokenManager.setTokens(token, TokenManager.getRefreshToken());
+    }
+
+    // === URL PARAMS ===
+    var params = new URLSearchParams(window.location.search);
+    var ip = params.get('ip') || '';
+    var timeStr = params.get('time') || '';
+
+    if (!ip) {
+        showError('Thiếu tham số IP. Vui lòng quay lại danh sách gói tin.');
+        return;
+    }
+
+    // === XSS HELPER ===
+    function esc(str) {
+        if (str == null) return '';
+        var s = String(str);
+        var div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+
+    // === STATE ===
+    var state = {
+        isLoading: true,
+        error: '',
+        summary: {},
+        layers: {},
+        payload: {},
+        metadata: {},
+        hexViewMode: 'hex', // hex | ascii | both
+        openLayers: {},
+    };
+
+    // === SHOW HELPERS ===
+    function showError(msg) {
+        document.getElementById('state-loading').style.display = 'none';
+        document.getElementById('state-error').style.display = 'flex';
+        document.getElementById('error-text').textContent = msg;
+    }
+
+    // === BUILD HEADER CARDS ===
+    function buildHeaderCards() {
+        var s = state.summary;
+        var m = state.metadata;
+        var cards = [];
+
+        // Card 1: Source
+        cards.push(
+            '<div class="glass-card">' +
+                '<div class="glass-card-header"><i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--red);"></i> Nguồn</div>' +
+                '<div class="glass-card-body">' +
+                    '<div class="value red">' + esc(s.src_ip || 'N/A') + '</div>' +
+                    '<div class="sub">' + (s.src_port ? 'Cổng: ' + esc(s.src_port) : 'Không có cổng') + '</div>' +
+                '</div>' +
+            '</div>'
+        );
+
+        // Card 2: Destination
+        cards.push(
+            '<div class="glass-card">' +
+                '<div class="glass-card-header"><i class="fa-solid fa-bullseye" style="color:var(--cyan);"></i> Đích</div>' +
+                '<div class="glass-card-body">' +
+                    '<div class="value cyan">' + esc(s.dst_ip || 'N/A') + '</div>' +
+                    '<div class="sub">' + (s.dst_port ? 'Cổng: ' + esc(s.dst_port) : 'Không có cổng') + '</div>' +
+                '</div>' +
+            '</div>'
+        );
+
+        // Card 3: Protocol
+        var proto = (s.protocol || 'Unknown').toLowerCase();
+        var protoClass = (proto === 'tcp') ? 'proto-tcp' : (proto === 'udp') ? 'proto-udp' : (proto === 'icmp') ? 'proto-icmp' : 'proto-other';
+        cards.push(
+            '<div class="glass-card">' +
+                '<div class="glass-card-header"><i class="fa-solid fa-network-wired" style="color:var(--purple);"></i> Giao thức</div>' +
+                '<div class="glass-card-body">' +
+                    '<span class="proto-badge ' + protoClass + '">' + esc(s.protocol || 'Unknown') + '</span>' +
+                    '<div class="sub" style="margin-top:6px;">' + esc(s.info || s.protocol || 'N/A') + '</div>' +
+                '</div>' +
+            '</div>'
+        );
+
+        // Card 4: Timestamp
+        cards.push(
+            '<div class="glass-card">' +
+                '<div class="glass-card-header"><i class="fa-solid fa-clock" style="color:var(--yellow);"></i> Thời gian</div>' +
+                '<div class="glass-card-body">' +
+                    '<div class="value yellow">' + esc(s.timestamp || 'N/A') + '</div>' +
+                    '<div class="sub">ID #' + esc(s.record_id || 'N/A') + '</div>' +
+                '</div>' +
+            '</div>'
+        );
+
+        // Card 5: Length
+        cards.push(
+            '<div class="glass-card">' +
+                '<div class="glass-card-header"><i class="fa-solid fa-ruler-horizontal" style="color:var(--green);"></i> Độ dài</div>' +
+                '<div class="glass-card-body">' +
+                    '<div class="value green">' + esc(s.length || 0) + ' bytes</div>' +
+                    '<div class="sub">' + (
+                        (s.tcp_count ? 'TCP: ' + s.tcp_count + ' · ' : '') +
+                        (s.udp_count ? 'UDP: ' + s.udp_count + ' · ' : '') +
+                        (s.icmp_count ? 'ICMP: ' + s.icmp_count : '')
+                    ).replace(/ · $/, '') + '</div>' +
+                '</div>' +
+            '</div>'
+        );
+
+        // Card 6: Threat Score
+        var gn = parseFloat(m.gn_score || 0);
+        var gnClass = gn > 5 ? 'red' : gn > 2 ? 'yellow' : 'green';
+        cards.push(
+            '<div class="glass-card">' +
+                '<div class="glass-card-header"><i class="fa-solid fa-shield-halved" style="color:var(--orange);"></i> Điểm SCORE</div>' +
+                '<div class="glass-card-body">' +
+                    '<div class="value ' + gnClass + '">' + gn.toFixed(2) + '</div>' +
+                    '<div class="sub">Entropy: ' + (parseFloat(m.entropy || 0).toFixed(4)) + '</div>' +
+                '</div>' +
+            '</div>'
+        );
+
+        document.getElementById('summary-grid').innerHTML = cards.join('');
+    }
+
+    // === BUILD OSI TREE ===
+    function buildTree() {
+        var layers = state.layers;
+        var html = '';
+        var count = 0;
+        var layerIcons = {
+            frame: { icon: 'fa-ethernet', color: '#94a3b8' },
+            ipv4: { icon: 'fa-globe', color: '#3b82f6' },
+            tcp: { icon: 'fa-plug', color: '#f97316' },
+            udp: { icon: 'fa-bolt', color: '#a855f7' },
+            icmp: { icon: 'fa-bug', color: '#f59e0b' },
+        };
+        var layerLabels = {
+            frame: 'Frame (Lớp 2)',
+            ipv4: 'IPv4 (Lớp 3)',
+            tcp: 'TCP (Lớp 4)',
+            udp: 'UDP (Lớp 4)',
+            icmp: 'ICMP (Lớp 4)',
+        };
+
+        Object.keys(layers).forEach(function(key) {
+            var layer = layers[key];
+            if (!layer || typeof layer !== 'object') return;
+            count++;
+            var li = layerIcons[key] || { icon: 'fa-circle', color: '#94a3b8' };
+            var label = layerLabels[key] || key.toUpperCase();
+            var fieldCount = Object.keys(layer).length;
+            var isOpen = state.openLayers[key] ? 'open' : '';
+            var isOpenBody = state.openLayers[key] ? 'open' : '';
+
+            html += '<div class="tree-section">';
+            html += '<div class="tree-section-header" onclick="toggleTreeLayer(\'' + esc(key) + '\')">';
+            html += '<span class="layer-icon" style="background:' + li.color + '20;color:' + li.color + ';"><i class="fa-solid ' + li.icon + '"></i></span>';
+            html += '<span class="layer-name">' + esc(label) + '</span>';
+            html += '<span class="layer-count">' + fieldCount + ' trường</span>';
+            html += '<span class="tree-toggle ' + isOpen + '">&#9656;</span>';
+            html += '</div>';
+            html += '<div class="tree-section-body ' + isOpenBody + '" id="tree-body-' + esc(key) + '">';
+
+            Object.keys(layer).forEach(function(fieldKey) {
+                var val = layer[fieldKey];
+                var displayVal = String(val);
+
+                // Special rendering for TCP Flags
+                if (key === 'tcp' && fieldKey === 'Flags') {
+                    html += '<div class="field-row">';
+                    html += '<span class="field-key">' + esc(fieldKey) + '</span>';
+                    html += '<span class="field-val"><span class="flag-chips">';
+                    if (typeof val === 'string') {
+                        html += '<span class="flag-chip on">' + esc(val) + '</span>';
+                    } else if (typeof val === 'object' && val !== null) {
+                        Object.keys(val).forEach(function(flag) {
+                            var on = val[flag];
+                            html += '<span class="flag-chip ' + (on ? 'on' : 'off') + '">' + esc(flag) + '</span>';
+                        });
+                    } else {
+                        html += esc(displayVal);
+                    }
+                    html += '</span></span></div>';
+                    return;
+                }
+
+                // Highlight for flag field values
+                var valClass = (key === 'tcp' && /^Flag\s/.test(fieldKey) && val === '1') ? 'highlight' : '';
+
+                html += '<div class="field-row">';
+                html += '<span class="field-key">' + esc(fieldKey) + '</span>';
+                html += '<span class="field-val ' + valClass + '">' + esc(displayVal) + '</span>';
+                html += '</div>';
+            });
+
+            html += '</div></div>';
+        });
+
+        document.getElementById('tree-view').innerHTML = html || '<div class="state-empty">Không có dữ liệu lớp mạng.</div>';
+        document.getElementById('layer-count-badge').textContent = count + ' lớp';
+    }
+
+    // === BUILD HEX DUMP ===
+    function buildHexDump() {
+        var payload = state.payload;
+        var hexLines = payload.hex_lines || [];
+        var container = document.getElementById('hex-container');
+        var html = '';
+        var mode = state.hexViewMode;
+
+        if (hexLines.length === 0) {
+            container.innerHTML = '<div class="state-empty">Không có dữ liệu hex dump.</div>';
+            return;
+        }
+
+        hexLines.forEach(function(line) {
+            var offset = esc(line.offset || '');
+            var hex = esc(line.hex || '');
+            var ascii = esc(line.ascii || '');
+            html += '<div class="hex-row">';
+
+            if (mode === 'hex' || mode === 'both') {
+                html += '<span class="hex-offset">' + offset + '</span>';
+                html += '<span class="hex-bytes">' + hex + '</span>';
+            }
+            if (mode === 'ascii' || mode === 'both') {
+                if (mode === 'ascii') {
+                    html += '<span class="hex-offset">' + offset + '</span>';
+                    html += '<span style="flex:1;">' + ascii + '</span>';
+                } else {
+                    html += '<span class="hex-ascii">' + ascii + '</span>';
+                }
+            }
+            html += '</div>';
+        });
+
+        container.innerHTML = html;
+        document.getElementById('hex-info-text').textContent = hexLines.length + ' dòng';
+        document.getElementById('hex-count-badge').textContent = hexLines.length + ' lines';
+    }
+
+    // === TOGGLE LAYER ===
+    window.toggleTreeLayer = function(key) {
+        state.openLayers[key] = !state.openLayers[key];
+        buildTree();
+    };
+
+    // === SWITCH HEX VIEW ===
+    window.switchHexView = function(mode) {
+        state.hexViewMode = mode;
+        document.getElementById('btn-hex-view').className = 'hex-toolbar-btn' + (mode === 'hex' ? ' active' : '');
+        document.getElementById('btn-ascii-view').className = 'hex-toolbar-btn' + (mode === 'ascii' ? ' active' : '');
+        document.getElementById('btn-both-view').className = 'hex-toolbar-btn' + (mode === 'both' ? ' active' : '');
+        buildHexDump();
+    };
+
+    // === FETCH DATA ===
+    function fetchPacketDetails() {
+        document.getElementById('page-sub').textContent = ip + (timeStr ? ' @ ' + timeStr : '');
+
+        API.alerts.getPacketDetails(ip, timeStr)
+            .then(function(json) {
+                document.getElementById('state-loading').style.display = 'none';
+
+                if (json.status === 'success' && json.data) {
+                    var data = json.data;
+                    state.summary = data.summary || {};
+                    state.layers = data.layers || {};
+                    state.payload = data.payload || {};
+                    state.metadata = data.metadata || {};
+                    state.isLoading = false;
+
+                    // Auto-open first layer
+                    var layerKeys = Object.keys(state.layers);
+                    if (layerKeys.length > 0) {
+                        state.openLayers[layerKeys[0]] = true;
+                    }
+
+                    // Show panes
+                    document.getElementById('pane-header').style.display = 'block';
+                    document.getElementById('pane-3col').style.display = 'flex';
+
+                    // Severity badge
+                    var m = state.metadata;
+                    var gn = parseFloat(m.gn_score || 0);
+                    var sevEl = document.getElementById('sev-badge');
+                    if (gn > 5) {
+                        sevEl.className = 'severity-bar sev-critical';
+                        sevEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> NGHIÊM TRỌNG';
+                    } else if (gn > 2) {
+                        sevEl.className = 'severity-bar sev-warning';
+                        sevEl.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> CẢNH BÁO';
+                    } else {
+                        sevEl.className = 'severity-bar sev-low';
+                        sevEl.innerHTML = '<i class="fa-solid fa-shield-halved"></i> AN TOÀN';
+                    }
+                    sevEl.style.display = 'inline-flex';
+
+                    buildHeaderCards();
+                    buildTree();
+                    buildHexDump();
+                } else {
+                    showError(json.message || 'Không tìm thấy dữ liệu gói tin.');
+                }
+            })
+            .catch(function(e) {
+                document.getElementById('state-loading').style.display = 'none';
+                var msg = e.message || 'Lỗi kết nối API.';
+                // User-friendly messages for common errors
+                if (e.status === 404) msg = 'Không tìm thấy gói tin từ IP ' + ip + (timeStr ? ' tại ' + timeStr : '') + '. Vui lòng kiểm tra lại tham số.';
+                if (e.status === 401) { window.location.replace('/login'); return; }
+                showError(msg);
+            });
+    }
+
+    // === NAV BACK ===
+    document.getElementById('btn-back').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.history.back();
+    });
+
+    // === INIT ===
+    fetchPacketDetails();
+
+})();
+</script>
+</body>
+</html>

@@ -1,14 +1,209 @@
-# ==================================================================
-# BK-IDS SOC: TỆP LUẬT SNORT 3 (LOCAL RULES)
-# Tự động đồng bộ từ Database - Không chỉnh sửa thủ công
-# ==================================================================
+# =========================================================================
+# BK-IDS SOC: SNORT 3 LOCAL RULES — Enterprise Edition v12.0
+# Cú pháp: SNORT 3 NATIVE
+# Biến: HOME_NET, EXTERNAL_NET, HTTP_PORTS, SQL_PORTS, SSH_PORTS
+#        (định nghĩa trong snort.lua)
+# ⚠  Snort 3 = CASE-SENSITIVE. Viết thường nếu muốn match chính xác.
+# =========================================================================
 
-# --- KIM BÀI MIỄN TỬ (WHITELIST TỪ .ENV) ---
-pass ip 127.0.0.1 any <> any any (msg:"Bypass Whitelist IP 127.0.0.1"; sid:100000; rev:1;)
-pass ip 192.168.142.1 any <> any any (msg:"Bypass Whitelist IP 192.168.142.1"; sid:100001; rev:1;)
-pass ip 192.168.142.128 any <> any any (msg:"Bypass Whitelist IP 192.168.142.128"; sid:100002; rev:1;)
-# -------------------------------------------
+# ===== [NHOM 0] PHÂN TÍCH TCP ANOMALY (Layer 4) =====
+# Các rule này KHÔNG cần http_inspect, match trực TCP flags → luôn fire
 
-drop tcp any any -> any any (msg:"[DROP] SQL Injection get version"; content:"convert(int,@@version)",nocase; classtype:web-application-attack; sid:1000001; rev:5;)
+drop tcp any any -> $HOME_NET any ( msg:"[ANOMALY] TCP SYN+FIN flags (scan/evasion)"; flow:stateless; flags:SF; detection_filter:track by_src, count 5, seconds 3; classtype:attempted-recon; sid:1000101; rev:2;)
 
-drop tcp any any -> any any (msg:"[DROP] HTTP Flood DoS Attack Detected"; flow:established,to_server; content:"GET"; http_method; detection_filter:track by_src, count 50, seconds 5; sid:1000002; rev:1;)
+drop tcp any any -> $HOME_NET any ( msg:"[ANOMALY] TCP SYN+RST flags (scan/evasion)"; flow:stateless; flags:SR; detection_filter:track by_src, count 5, seconds 3; classtype:attempted-recon; sid:1000102; rev:2;)
+
+drop tcp any any -> $HOME_NET any ( msg:"[ANOMALY] TCP all flags set (XMAS scan)"; flow:stateless; flags:FPU; classtype:attempted-recon; sid:1000103; rev:1;)
+
+drop tcp any any <> $HOME_NET any ( msg:"[ANOMALY] TCP no flags (NULL scan)"; flow:stateless; flags:0; classtype:attempted-recon; sid:1000104; rev:1;)
+
+drop tcp any any <> any any ( msg:"[ANOMALY] TCP FIN without session (stealth)"; flow:stateless; flags:F; detection_filter:track by_src, count 30, seconds 5; classtype:attempted-recon; sid:1000105; rev:2;)
+
+
+# ===== [NHOM 1] WHITELIST (bỏ qua false positive) =====
+
+# DISABLED: pass ip 192.168.13.1 any <> any any ( msg:"[WHITELIST] Gateway router"; sid:100001; rev:1;)
+
+# pass ip 192.168.13.128 any <> any any ( msg:"[WHITELIST] SOC Analyst WS"; sid:100002; rev:1;)
+
+# pass ip 192.168.13.129 any <> any any ( msg:"[WHITELIST] SOC Server host"; sid:100003; rev:1;)
+
+pass ip 172.18.0.0/16 any <> any any ( msg:"[WHITELIST] Docker bridge"; sid:100004; rev:1;)
+
+# Google DNS / Cloudflare pass
+pass udp any 53 -> any any ( msg:"[WHITELIST] DNS reply from upstream"; sid:100005; rev:1;)
+
+
+# ===== [NHOM 2] SQL INJECTION =====
+# Snort 3 không có nocase → viết UPPERCASE cho common SQLi patterns
+# Flask API backend trên port 5000 (internal) + 5050 (external)
+# Portal gateway trên port 9000
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[BLOCK] SQLi UNION SELECT payload"; flow:established,to_server; http_uri; content:"UNION"; content:"SELECT"; classtype:web-application-attack; sid:1001001; rev:7;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[BLOCK] SQLi UNION ALL SELECT payload"; content:"UNION"; content:"ALL"; content:"SELECT"; classtype:web-application-attack; sid:1001002; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] SQLi OR-based auth bypass"; content:"or 1=1"; content:"--"; classtype:web-application-attack; sid:1001003; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] SQLi 'OR '1'='1' tautology"; content:"'OR '1'='1"; classtype:web-application-attack; sid:1001004; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[BLOCK] SQLi SLEEP time-based blind"; content:"SLEEP("; classtype:web-application-attack; sid:1001005; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] SQLi BENCHMARK time-based blind"; content:"BENCHMARK("; classtype:web-application-attack; sid:1001006; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[BLOCK] SQLi xp_cmdshell MSSQL RCE"; content:"xp_cmdshell"; classtype:web-application-attack; sid:1001007; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] SQLi convert(int,@@version) fingerprinting"; content:"convert(int"; classtype:web-application-attack; sid:1001008; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] SQLi DROP TABLE destructive"; content:"DROP"; content:"TABLE"; classtype:web-application-attack; sid:1001009; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] SQLi INSERT INTO injection"; content:"INSERT"; content:"INTO"; classtype:web-application-attack; sid:1001010; rev:3;)
+
+
+# ===== [NHOM 3] CROSS-SITE SCRIPTING (XSS) =====
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] XSS script tag injection"; content:"<script"; classtype:web-application-attack; sid:1002001; rev:6;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] XSS javascript URI scheme"; content:"javascript:"; classtype:web-application-attack; sid:1002002; rev:5;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] XSS onerror handler"; content:"onerror="; classtype:web-application-attack; sid:1002003; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] XSS onload handler"; content:"onload="; classtype:web-application-attack; sid:1002004; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] XSS img onerror payload"; content:"<img"; content:"onerror="; classtype:web-application-attack; sid:1002005; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] XSS document.cookie steal"; content:"document.cookie"; classtype:web-application-attack; sid:1002006; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] XSS evasion: <scr ipt"; content:"alert("; content:"<"; classtype:web-application-attack; sid:1002007; rev:4;)
+
+
+# ===== [NHOM 4] PATH TRAVERSAL / LFI =====
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] Path Traversal ../ 2 levels"; content:"../"; classtype:web-application-attack; sid:1003001; rev:7;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] Path Traversal ../../ 3 levels"; content:"../../"; classtype:web-application-attack; sid:1003002; rev:5;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] LFI /etc/passwd read attempt"; content:"/etc/passwd"; classtype:web-application-attack; sid:1003003; rev:6;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] LFI /etc/shadow read attempt"; content:"/etc/shadow"; classtype:web-application-attack; sid:1003004; rev:5;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] LFI boot.ini read attempt (Windows)"; content:"boot.ini"; classtype:web-application-attack; sid:1003005; rev:5;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] RFI http:// in path param"; flow:established,to_server; content:"http://"; content:"cmd="; classtype:web-application-attack; sid:1003006; rev:3;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] PHP php://filter wrapper LFI"; flow:established,to_server; content:"php://filter"; classtype:web-application-attack; sid:1003007; rev:2;)
+
+
+# ===== [NHOM 5] REMOTE CODE EXECUTION / WEB SHELL =====
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[BLOCK] RCE PHP eval injection"; flow:established,to_server; content:"eval("; classtype:web-application-attack; sid:1004001; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[BLOCK] RCE PHP system() call"; content:"system("; classtype:web-application-attack; sid:1004002; rev:5;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[BLOCK] RCE PHP exec() call"; content:"exec("; classtype:web-application-attack; sid:1004003; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[BLOCK] RCE PHP passthru() call"; content:"passthru("; classtype:web-application-attack; sid:1004004; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[BLOCK] WebShell c99shell signature"; content:"c99shell"; classtype:web-application-attack; sid:1004005; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] RCE cmd.exe in URI (Windows)"; content:"cmd.exe"; classtype:web-application-attack; sid:1004006; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] RCE powershell in URI (Windows)"; content:"powershell"; classtype:web-application-attack; sid:1004007; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] WebShell WSO signature"; content:"WSO"; classtype:web-application-attack; sid:1004008; rev:3;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] RCE bash pipe reverse shell"; content:"bash -i"; content:"dev/tcp"; classtype:web-application-attack; sid:1004009; rev:3;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] RCE nc (netcat) backdoor"; content:"nc "; content:"-e "; classtype:web-application-attack; sid:1004010; rev:3;)
+
+
+# ===== [NHOM 6] DENIAL-OF-SERVICE =====
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[BLOCK] HTTP Flood >50req/5s per src"; flow:established,to_server; detection_filter:track by_src, count 50, seconds 5; classtype:denial-of-service; sid:1005001; rev:4;)
+
+drop tcp any any -> $HOME_NET 5050 ( msg:"[BLOCK] API Flood >30req/10s per src"; flow:established,to_server; detection_filter:track by_src, count 30, seconds 10; classtype:denial-of-service; sid:1005002; rev:3;)
+
+drop tcp any any -> $HOME_NET any ( msg:"[BLOCK] SYN Flood >100/2s to dst"; flow:stateless; flags:S; detection_filter:track by_dst, count 100, seconds 2; classtype:denial-of-service; sid:1005003; rev:3;)
+
+# alert tcp any any -> $HOME_NET any ( msg:"[BLOCK] SYN-ACK reflection >50/5s to dst"; flow:stateless; flags:SA; detection_filter:track by_dst, count 50, seconds 5; classtype:denial-of-service; sid:1005004; rev:1;)
+
+
+# ===== [NHOM 7] SSH BRUTE FORCE =====
+
+drop tcp any any -> $HOME_NET 22 ( msg:"[BLOCK] SSH Brute Force >5conn/60s"; flow:established,to_server; detection_filter:track by_src, count 5, seconds 60; classtype:attempted-admin; sid:1006001; rev:4;)
+
+
+# ===== [NHOM 8] MySQL BRUTE FORCE =====
+
+drop tcp any any -> $HOME_NET 3306 ( msg:"[BLOCK] MySQL Brute Force >5/30s"; flow:established,to_server; detection_filter:track by_src, count 5, seconds 30; classtype:attempted-admin; sid:1007001; rev:3;)
+
+
+# ===== [NHOM 9] PORT SCANNING / RECONNAISSANCE =====
+
+drop tcp any any -> $HOME_NET any ( msg:"[RECON] FIN scan detected"; flow:stateless; flags:F; detection_filter:track by_src, count 20, seconds 10; classtype:attempted-recon; sid:1008001; rev:4;)
+
+drop tcp any any -> $HOME_NET any ( msg:"[RECON] SYN scan detected (nmap -sS)"; flow:stateless; flags:S; detection_filter:track by_src, count 30, seconds 15; classtype:attempted-recon; sid:1008002; rev:4;)
+
+drop tcp any any -> $HOME_NET any ( msg:"[RECON] XMAS scan detected (nmap -sX)"; flow:stateless; flags:FPU; classtype:attempted-recon; sid:1008003; rev:3;)
+
+drop tcp any any <> $HOME_NET any ( msg:"[RECON] NULL scan detected (nmap -sN)"; flow:stateless; flags:0; classtype:attempted-recon; sid:1008004; rev:3;)
+
+drop icmp any any -> $HOME_NET any ( msg:"[RECON] ICMP ping sweep"; itype:8; detection_filter:track by_src, count 10, seconds 10; classtype:attempted-recon; sid:1008005; rev:3;)
+
+# alert tcp any any -> $HOME_NET any ( msg:"[RECON] SYN-ACK scan (nmap -sA ack scan)"; flow:stateless; flags:SA; detection_filter:track by_src, count 20, seconds 10; classtype:attempted-recon; sid:1008006; rev:1;)
+
+
+# ===== [NHOM 10] C2 / BACKDOOR COMMUNICATION =====
+
+drop tcp $HOME_NET any -> any 4444 ( msg:"[C2] Outbound Metasploit default port 4444"; flow:established,to_server; classtype:trojan-activity; sid:1009001; rev:3;)
+
+drop tcp $HOME_NET any -> any 1337 ( msg:"[C2] Outbound C2 port 1337 (elite)"; flow:established,to_server; classtype:trojan-activity; sid:1009002; rev:2;)
+
+drop tcp $HOME_NET any -> any 31337 ( msg:"[C2] Outbound BackOrifice port 31337"; flow:established,to_server; classtype:trojan-activity; sid:1009003; rev:2;)
+
+drop tcp $HOME_NET any -> any 4443 ( msg:"[C2] Outbound Cobalt Strike default port 4443"; flow:established,to_server; classtype:trojan-activity; sid:1009004; rev:1;)
+
+drop tcp $HOME_NET any -> any 5555 ( msg:"[C2] Outbound ADB/MultiSpy port 5555"; flow:established,to_server; classtype:trojan-activity; sid:1009005; rev:1;)
+
+
+# ===== [NHOM 11] SENSITIVE PATH / ADMIN PANEL ACCESS =====
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[RECON] /phpMyAdmin access attempt"; flow:established,to_server; content:"phpMyAdmin"; classtype:attempted-recon; sid:1010001; rev:2;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[RECON] /wp-admin access attempt"; flow:established,to_server; content:"wp-admin"; classtype:attempted-recon; sid:1010002; rev:2;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[RECON] /server-status Apache probe"; flow:established,to_server; content:"server-status"; classtype:attempted-recon; sid:1010003; rev:2;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[RECON] /actuator Spring Boot exposure"; flow:established,to_server; content:"actuator"; classtype:attempted-recon; sid:1010004; rev:1;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[RECON] /.git/config source leak"; flow:established,to_server; content:".git/config"; classtype:attempted-recon; sid:1010005; rev:1;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[RECON] /api/swagger.json API doc probe"; flow:established,to_server; content:"swagger.json"; classtype:attempted-recon; sid:1010006; rev:1;)
+
+
+# ===== [NHOM 12] DATA EXFILTRATION / LARGE OUTBOUND =====
+
+# alert tcp $HOME_NET any -> any any ( msg:"[EXFIL] Large outbound transfer >10MB"; flow:established,to_client; detection_filter:track by_src, count 1, seconds 1; classtype:policy-violation; sid:1011001; rev:1;)
+
+
+# ===== [NHOM 13] COMMAND INJECTION =====
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[BLOCK] CMD injection semicolon bypass"; flow:established,to_server; content:";cat "; http_uri; classtype:web-application-attack; sid:1012001; rev:3;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] CMD injection pipe bypass (|ls / |cat)"; flow:established,to_server; content:"cmd.exe"; http_uri; content:"dir"; http_uri; classtype:web-application-attack; sid:1012002; rev:4;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] CMD injection whoami check"; flow:established,to_server; content:"whoami"; http_uri; classtype:web-application-attack; sid:1012003; rev:2;)
+
+drop tcp any any -> $HOME_NET $HTTP_PORTS ( msg:"[ALERT] CMD injection $(command) substitution"; flow:established,to_server; content:"$("; http_uri; content:"id"; http_uri; classtype:web-application-attack; sid:1012004; rev:2;)
+
+
+# =========================================================================
+# TONG: 63 rules
+#   BLOCK  x20  (drop)
+#   ALERT  x30  (alert)
+#   RECON  x12  (recon/scan)
+#   C2     x5   (trojan)
+#   WHITELIST x5 (pass)
+#   ANOMALY x5  (TCP flags)
+#   EXFIL  x1   (data leak)
+# =========================================================================

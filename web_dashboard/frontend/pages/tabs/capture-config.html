@@ -1,0 +1,213 @@
+<!-- pages/tabs/capture-config.html -->
+<section v-show="activeTab === 'capture-config'" class="view-section">
+    <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <h2 class="text-white m-0" style="font-weight: 700; letter-spacing: -0.5px">
+                <i class="fa-solid fa-microchip me-2" style="color: var(--accent-cyan); filter: drop-shadow(0 0 8px rgba(6,182,212,0.5))"></i> 
+                Cấu hình NGIPS & Tiền xử lý
+            </h2>
+            <p class="text-muted mt-2 mb-0" style="font-size: 0.95rem">
+                Bảng điều khiển lõi đồng bộ <strong>Hệ thống Phát hiện Kép (Dual-Engine)</strong> theo chuẩn doanh nghiệp.
+            </p>
+        </div>
+        <div class="px-3 py-2 rounded-3" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16,185,129,0.3); box-shadow: 0 0 15px rgba(16,185,129,0.15)">
+             <span class="fw-bold" style="color: var(--accent-green); font-size: 0.85rem; letter-spacing: 1px">
+                 <i class="fa-solid fa-satellite-dish fa-beat-fade me-2"></i>DECOUPLED IPS MODE
+             </span>
+        </div>
+    </div>
+
+    <!-- 1. MẠNG CƠ BẢN -->
+    <div class="card-glass mb-4 p-4" style="border-left: 4px solid var(--accent-purple); position: relative; overflow: hidden; background: linear-gradient(90deg, rgba(30,41,59,0.6) 0%, rgba(15,23,42,0.8) 100%)">
+        <div style="position: absolute; right: -2%; top: -15%; font-size: 10rem; opacity: 0.02; color: #fff"><i class="fa-solid fa-network-wired"></i></div>
+        <h5 class="mb-4 text-white"><i class="fa-solid fa-globe me-2" style="color: var(--accent-purple)"></i>Quy hoạch Mạng & Firewall</h5>
+        <div class="row g-4 position-relative">
+            <div class="col-md-4">
+                <label class="form-label text-uppercase fw-bold text-muted" style="font-size: 0.75rem; letter-spacing: 0.5px">Lớp IP Bảo vệ (HOME_NET)</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark border-secondary text-muted"><i class="fa-solid fa-network-wired"></i></span>
+                    <input type="text" v-model="captureConfig.home_net" class="form-dark form-control" placeholder="192.168.13.0/24">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label text-uppercase fw-bold text-muted" style="font-size: 0.75rem; letter-spacing: 0.5px">Cổng Giám sát (MONITORED)</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark border-secondary text-muted"><i class="fa-solid fa-ethernet"></i></span>
+                    <input type="text" v-model="captureConfig.ports" class="form-dark form-control" placeholder="80, 443, 22, 3306">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label text-uppercase fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px; color: var(--accent-green)">Danh sách Trắng (WHITELIST)</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark border-secondary text-muted"><i class="fa-solid fa-shield-check"></i></span>
+                    <input type="text" v-model="captureConfig.whitelist" class="form-dark form-control" placeholder="127.0.0.1, 192.168.13.1">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. DUAL ENGINE GRID -->
+    <div class="row g-4 mb-4">
+        <!-- SNORT 3 NGIPS -->
+        <div class="col-xl-6">
+            <div class="card-glass h-100 p-0" style="border: 1px solid rgba(6,182,212,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.2)">
+                <div class="p-4" style="background: linear-gradient(135deg, rgba(6,182,212,0.1) 0%, transparent 100%); border-bottom: 1px solid rgba(255,255,255,0.05)">
+                    <h5 class="m-0 text-white fw-bold d-flex align-items-center">
+                        <i class="fa-solid fa-signature me-2" style="color: var(--accent-cyan); font-size: 1.2rem"></i>
+                        Snort 3 NGIPS Engine
+                    </h5>
+                    <p class="text-muted mt-2 mb-0" style="font-size: 0.85rem">Phát hiện xâm nhập dựa trên chữ ký (Signature) và kiểm tra L7 sâu.</p>
+                </div>
+                <div class="p-4">
+                    <!-- Wizard & Binder -->
+                    <div class="d-flex justify-content-between align-items-center p-3 rounded-3 mb-3" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s ease" onmouseover="this.style.background='rgba(6,182,212,0.05)'; this.style.borderColor='rgba(6,182,212,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.05)'">
+                        <div>
+                            <div class="text-white fw-bold" style="font-size: 0.9rem"><i class="fa-solid fa-wand-magic-sparkles me-2" style="color: var(--accent-cyan)"></i>Wizard & Binder</div>
+                            <div class="text-muted" style="font-size: 0.75rem; margin-top: 4px">Nhận diện giao thức động không phụ thuộc cổng (Dynamic Protocol Detection).</div>
+                        </div>
+                        <div class="form-check form-switch fs-5 m-0"><input class="form-check-input" type="checkbox" checked disabled></div>
+                    </div>
+
+                    <!-- Reputation -->
+                    <div class="d-flex justify-content-between align-items-center p-3 rounded-3 mb-3" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s ease" onmouseover="this.style.background='rgba(16,185,129,0.05)'; this.style.borderColor='rgba(16,185,129,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.05)'">
+                        <div>
+                            <div class="text-white fw-bold" style="font-size: 0.9rem"><i class="fa-solid fa-address-book me-2" style="color: var(--accent-green)"></i>Reputation Preprocessor</div>
+                            <div class="text-muted" style="font-size: 0.75rem; margin-top: 4px">Danh sách IP Đen/Trắng nội tại giảm tải xử lý CPU cho Engine.</div>
+                        </div>
+                        <div class="form-check form-switch fs-5 m-0"><input class="form-check-input" type="checkbox" checked disabled></div>
+                    </div>
+                    
+                    <!-- OpenAppID -->
+                    <div class="d-flex justify-content-between align-items-center p-3 rounded-3 mb-3" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s ease" onmouseover="this.style.background='rgba(245,158,11,0.05)'; this.style.borderColor='rgba(245,158,11,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.05)'">
+                        <div>
+                            <div class="text-white fw-bold" style="font-size: 0.9rem"><i class="fa-solid fa-layer-group me-2" style="color: var(--accent-yellow)"></i>OpenAppID (L7)</div>
+                            <div class="text-muted" style="font-size: 0.75rem; margin-top: 4px">Phân tách và nhận dạng ứng dụng Lớp 7 (Facebook, Netflix, BitTorrent).</div>
+                        </div>
+                        <div class="form-check form-switch fs-5 m-0"><input class="form-check-input" type="checkbox" v-model="captureConfig.pre_appid"></div>
+                    </div>
+                    
+                    <!-- File Inspection -->
+                    <div class="d-flex justify-content-between align-items-center p-3 rounded-3" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s ease" onmouseover="this.style.background='rgba(239,68,68,0.05)'; this.style.borderColor='rgba(239,68,68,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.05)'">
+                        <div>
+                            <div class="text-white fw-bold" style="font-size: 0.9rem"><i class="fa-solid fa-file-shield me-2" style="color: var(--accent-red)"></i>File Inspection (file_id)</div>
+                            <div class="text-muted" style="font-size: 0.75rem; margin-top: 4px">Bóc tách và định danh tệp tin chứa mã độc (Malware/PDF/EXE).</div>
+                        </div>
+                        <div class="form-check form-switch fs-5 m-0"><input class="form-check-input" type="checkbox" checked disabled></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ANOMALY SENSOR -->
+        <div class="col-xl-6">
+            <div class="card-glass h-100 p-0" style="border: 1px solid rgba(245,158,11,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.2)">
+                <div class="p-4" style="background: linear-gradient(135deg, rgba(245,158,11,0.1) 0%, transparent 100%); border-bottom: 1px solid rgba(255,255,255,0.05)">
+                    <h5 class="m-0 text-white fw-bold d-flex align-items-center">
+                        <i class="fa-solid fa-wave-square me-2" style="color: var(--accent-yellow); font-size: 1.2rem"></i>
+                        Anomaly Sensor (CUSUM)
+                    </h5>
+                    <p class="text-muted mt-2 mb-0" style="font-size: 0.85rem">Phát hiện các mẫu hành vi bất thường, DoS/DDoS, và Zero-Day.</p>
+                </div>
+                <div class="p-4">
+                    <!-- Bypass GIL -->
+                    <div class="d-flex justify-content-between align-items-center p-3 rounded-3 mb-3" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); transition: all 0.3s ease" onmouseover="this.style.background='rgba(16,185,129,0.05)'; this.style.borderColor='rgba(16,185,129,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.05)'">
+                        <div>
+                            <div class="text-white fw-bold" style="font-size: 0.9rem"><i class="fa-solid fa-server me-2" style="color: var(--accent-green)"></i>Multiprocessing (Bypass GIL)</div>
+                            <div class="text-muted" style="font-size: 0.75rem; margin-top: 4px">Kích hoạt Pool xử lý đa luồng Native chống nghẽn thắt cổ chai Python.</div>
+                        </div>
+                        <span class="badge" style="background: rgba(16,185,129,0.2); color: #34d399; border: 1px solid rgba(16,185,129,0.5)">ACTIVE</span>
+                    </div>
+
+                    <!-- Entropy & Thresholds -->
+                    <div class="p-3 rounded-3 mb-3 position-relative overflow-hidden" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05)">
+                        <div style="position: absolute; right: -5%; bottom: -15%; font-size: 6rem; opacity: 0.03; color: var(--accent-yellow)"><i class="fa-solid fa-chart-line"></i></div>
+                        <div class="text-white fw-bold mb-3 position-relative" style="font-size: 0.9rem"><i class="fa-solid fa-sliders me-2" style="color: var(--accent-yellow)"></i>Thuật toán CUSUM & Entropy</div>
+                        <div class="row g-3 position-relative">
+                            <div class="col-sm-6">
+                                <label class="form-label text-muted" style="font-size: 0.7rem; text-transform: uppercase">Chu kỳ Quét (s)</label>
+                                <input type="number" class="form-dark form-control form-control-sm" value="5" readonly style="background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.1)">
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label text-muted" style="font-size: 0.7rem; text-transform: uppercase">Ngưỡng Bất thường (H)</label>
+                                <input type="number" class="form-dark form-control form-control-sm" value="700.0" readonly style="background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.1)">
+                            </div>
+                        </div>
+                        <div class="text-center mt-3 position-relative">
+                            <a href="#" @click.prevent="switchTab('anomaly-config')" style="font-size: 0.8rem; color: var(--accent-cyan); text-decoration: none; padding: 5px 10px; border-radius: 4px; transition: background 0.2s" onmouseover="this.style.background='rgba(6,182,212,0.1)'" onmouseout="this.style.background='transparent'">
+                                Điều chỉnh thông số chi tiết <i class="fa-solid fa-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. DECOUPLED IPS ARCHITECTURE DIAGRAM -->
+    <div class="card-glass p-0 overflow-hidden mb-4" style="border: 1px solid rgba(16,185,129,0.3); background: rgba(0,0,0,0.2); box-shadow: inset 0 0 20px rgba(0,0,0,0.5)">
+        <div class="p-3 text-center" style="background: rgba(16,185,129,0.1); border-bottom: 1px solid rgba(16,185,129,0.2)">
+            <h6 class="m-0 text-white" style="letter-spacing: 0.5px"><i class="fa-solid fa-code-merge me-2" style="color: var(--accent-green)"></i>Đồng bộ Phản ứng Tập trung (Decoupled SOAR)</h6>
+        </div>
+        <div class="p-4 d-flex justify-content-center align-items-center flex-column flex-md-row gap-4 position-relative">
+            
+            <!-- Background Lines -->
+            <div class="d-none d-md-block position-absolute w-100" style="height: 2px; background: rgba(255,255,255,0.05); top: 50%; z-index: 0"></div>
+
+            <!-- Sources -->
+            <div class="d-flex flex-column gap-3 text-center position-relative z-1">
+                <div class="p-3 rounded-3" style="border: 1px dashed var(--accent-cyan); background: rgba(6,182,212,0.05); min-width: 160px; box-shadow: 0 4px 10px rgba(0,0,0,0.3)">
+                    <i class="fa-solid fa-signature fs-4 mb-2" style="color: var(--accent-cyan)"></i><br>
+                    <span class="text-white fw-bold" style="font-size: 0.8rem">Snort 3 NGIPS</span>
+                </div>
+                <div class="p-3 rounded-3" style="border: 1px dashed var(--accent-yellow); background: rgba(245,158,11,0.05); min-width: 160px; box-shadow: 0 4px 10px rgba(0,0,0,0.3)">
+                    <i class="fa-solid fa-wave-square fs-4 mb-2" style="color: var(--accent-yellow)"></i><br>
+                    <span class="text-white fw-bold" style="font-size: 0.8rem">Anomaly Sensor</span>
+                </div>
+            </div>
+
+            <!-- Flow -->
+            <div class="d-none d-md-flex align-items-center position-relative z-1" style="color: rgba(255,255,255,0.3); font-size: 2rem">
+                <i class="fa-solid fa-angles-right fa-fade"></i>
+            </div>
+
+            <!-- SOAR Engine -->
+            <div class="p-4 text-center rounded-circle d-flex flex-column justify-content-center align-items-center position-relative z-1" style="width: 140px; height: 140px; background: radial-gradient(circle, rgba(16,185,129,0.25) 0%, rgba(0,0,0,0.8) 100%); border: 2px solid var(--accent-green); box-shadow: 0 0 25px rgba(16,185,129,0.3), inset 0 0 15px rgba(0,0,0,0.8)">
+                <i class="fa-solid fa-brain fs-2 mb-2" style="color: var(--accent-green)"></i>
+                <span class="text-white fw-bold" style="font-size: 0.9rem">SOAR<br>Engine</span>
+            </div>
+
+            <!-- Flow -->
+            <div class="d-none d-md-flex align-items-center position-relative z-1" style="color: rgba(255,255,255,0.3); font-size: 2rem">
+                <i class="fa-solid fa-angles-right fa-fade"></i>
+            </div>
+
+            <!-- Action -->
+            <div class="p-3 text-center rounded-3 position-relative overflow-hidden z-1" style="border: 1px solid rgba(239,68,68,0.5); background: rgba(239,68,68,0.1); min-width: 160px; box-shadow: 0 4px 15px rgba(239,68,68,0.15)">
+                <div style="position: absolute; right: -15px; bottom: -15px; font-size: 4.5rem; opacity: 0.05; color: var(--accent-red)"><i class="fa-solid fa-fire-flame-curved"></i></div>
+                <i class="fa-solid fa-ban fs-4 mb-2" style="color: var(--accent-red)"></i><br>
+                <span class="text-white fw-bold" style="font-size: 0.85rem">Firewall (Iptables)</span>
+                <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.05)">
+                    <div class="form-check form-switch d-flex justify-content-center m-0">
+                        <input class="form-check-input" type="checkbox" v-model="captureConfig.enable_firewall" id="firewallToggle">
+                        <label class="form-check-label ms-2 text-muted" for="firewallToggle" style="font-size: 0.75rem">Auto-Drop</label>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 4. ACTIONS -->
+    <div class="d-flex align-items-center justify-content-between p-3 rounded-3" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border)">
+        <div>
+            <span v-if="captureMsg" :style="{ color: captureMsgError ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 600 }">
+                <i class="fa-solid" :class="captureMsgError ? 'fa-xmark-circle' : 'fa-check-circle'"></i> {{ captureMsg }}
+            </span>
+            <span v-else class="text-muted" style="font-size: 0.85rem"><i class="fa-solid fa-info-circle me-1" style="color: var(--accent-cyan)"></i> Lưu lại thay đổi để đồng bộ kiến trúc NGIPS xuống Máy chủ.</span>
+        </div>
+        <button class="btn btn-primary d-flex align-items-center fw-bold" style="background: linear-gradient(135deg, var(--accent-cyan) 0%, #0284c7 100%); border: none; padding: 10px 24px; box-shadow: 0 4px 15px rgba(6,182,212,0.3)" @click="saveCaptureConfig" :disabled="captureSaving">
+            <i class="fa-solid fa-microchip me-2" :class="{'fa-spin': captureSaving}"></i>
+            {{ captureSaving ? 'ĐANG ĐỒNG BỘ...' : 'ÁP DỤNG HỆ THỐNG' }}
+        </button>
+    </div>
+</section>

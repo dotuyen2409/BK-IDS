@@ -60,7 +60,7 @@ def get_statistics():
             cursor = conn.cursor()
         
         date_filter = request.args.get('date')
-        limit = request.args.get('limit', default=100, type=int)
+        limit = request.args.get('limit', default=50, type=int)
         if limit > 2000: limit = 2000 
         
         env_threshold = get_current_threshold()
@@ -118,12 +118,18 @@ def get_statistics():
             # 🎯 LOGIC DOANH NGHIỆP: Trích xuất nhãn tấn công từ sample_hex
             sample_raw = str(r_dict.get('sample_hex') or '')
             attack_type = "BÌNH THƯỜNG"
+            top5_info = ""
             if sample_raw.startswith('['):
                 end_bracket = sample_raw.find(']')
                 if end_bracket > 0:
                     attack_type = sample_raw[1:end_bracket]
+                # Trích xuất TOP5 IPs nếu có
+                top5_idx = sample_raw.find('TOP5: ')
+                if top5_idx > 0:
+                    top5_end = sample_raw.find('\n', top5_idx)
+                    top5_info = sample_raw[top5_idx + 6:top5_end if top5_end > 0 else len(sample_raw)]
 
-            # 🎯 BỘ LỌC FALSE POSITIVE: Chỉ cảnh báo Đỏ khi Gn vượt ngưỡng VÀ không phải là trạng thái Hạ nhiệt
+            # 🎯 BỘ LỌC FALSE POSITIVE: Cải thiện phát hiện — bao gồm SPOOFED và FLOOD
             is_real_anomaly = False
             if gn_val >= nguong_h:
                 if "HẠ NHIỆT" not in attack_type and "BÌNH THƯỜNG" not in attack_type:
@@ -145,6 +151,8 @@ def get_statistics():
                 'h_threshold': nguong_h,
                 'entropi': round(entropy_val, 3),
                 'top_ip': r_dict.get('top_ip', 'Unknown'),
+                'top5_ips': top5_info,
+                'attack_type': attack_type,
                 'is_anomaly': is_real_anomaly # 🎯 Trả về trạng thái đã qua bộ lọc
             })
 

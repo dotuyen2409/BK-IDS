@@ -1,0 +1,23 @@
+<!-- pages/tabs/anomaly-config.html -->
+<section v-show="activeTab === 'anomaly-config'" class="view-section">
+    <div class="page-header"><h2>Cấu hình Thuật toán Bất thường & Firewall SOAR</h2><p>Tinh chỉnh độ nhạy CUSUM Entropy và cơ chế phản ứng tự động.</p></div>
+    <div class="card-glass">
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <h5 style="color:var(--accent-cyan);border-bottom:1px dashed var(--border);padding-bottom:8px">Tham số Thuật toán</h5>
+                <div class="mb-3"><label class="form-label text-muted" style="font-size:.75rem;text-transform:uppercase">Thời gian Lấy mẫu (Scan Interval)</label><input type="number" v-model="anomalyConfig.scan_interval" class="form-dark form-control" min="1" max="60"></div>
+                <div class="mb-3"><label class="form-label text-muted" style="font-size:.75rem;text-transform:uppercase">Ngưỡng An toàn (CuSUM Threshold H)</label><input type="number" step=".1" v-model="anomalyConfig.cusum_threshold" class="form-dark form-control"></div>
+            </div>
+            <div class="col-lg-6" style="background:rgba(239,68,68,.05);padding:20px;border-radius:8px;border:1px solid rgba(239,68,68,.2);border-left:4px solid var(--accent-red)">
+                <h5 style="color:var(--accent-red);border-bottom:1px dashed rgba(239,68,68,.3);padding-bottom:8px">Chính sách Phản ứng (Firewall)</h5>
+                <p class="text-muted" style="font-size:.82rem">Cho phép lõi phát hiện chủ động tương tác với Iptables.</p>
+                <div class="d-flex justify-content-between align-items-center mb-3"><span style="font-weight:600">Kích hoạt Chặn Tự động (Auto-Drop)</span><div class="form-check form-switch"><input class="form-check-input" type="checkbox" v-model="anomalyConfig.enable_firewall"></div></div>
+                <div class="mb-0"><label class="form-label text-muted" style="font-size:.75rem;text-transform:uppercase">Thời gian Cô lập IP (Ban Duration)</label><input type="number" v-model="anomalyConfig.ban_duration" class="form-dark form-control" :disabled="!anomalyConfig.enable_firewall"></div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-3 mt-4 pt-3" style="border-top:1px solid var(--border)">
+            <button class="btn btn-primary" @click="saveAnomalyConfig" :disabled="anomalySaving">{{ anomalySaving ? 'ĐANG ĐỒNG BỐ...' : '💾 ÁP DỤNG THUẬT TOÁN' }}</button>
+            <span v-if="anomalyMsg" :style="{ color: anomalyMsgError ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight:600 }">{{ anomalyMsg }}</span>
+        </div>
+    </div>
+</section>

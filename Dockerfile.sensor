@@ -1,53 +1,137 @@
-# /home/bk_ids/bk-ids/Dockerfile.sensor
+# /home/bkids/bk-ids/Dockerfile.sensor
+# ========================================================================
+# BK-IDS: Snort 3 IDS Engine — Full Build from Cisco Talos Source
+# Includes: Snort3 + libdaq + NFQUEUE + alert_json output
+# ========================================================================
 
-# Sử dụng Base Image chính thức của Snort 3 từ Cisco Talos
-FROM ciscotalos/snort3:latest
+FROM ubuntu:22.04 AS builder
 
-# 🎯 Chiếm lại quyền root để cài đặt phần mềm và can thiệp Iptables
-USER root
-
-# Tắt các thông báo tương tác khi cài gói trên Linux
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Cài đặt các công cụ biên dịch (Compiler) và thư viện NFQUEUE
+# Build dependencies
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    iptables \
-    net-tools \
-    iputils-ping \
-    tcpdump \
-    libnetfilter-queue-dev \
-    libmnl-dev \
     build-essential \
+    cmake \
     autoconf \
+    automake \
     libtool \
-    git \
     pkg-config \
-    kmod \
+    git \
+    wget \
+    libpcap-dev \
+    libpcre3-dev \
+    libdumbnet-dev \
+    zlib1g-dev \
+    liblzma-dev \
+    openssl \
+    libssl-dev \
+    libnghttp2-dev \
+    libluajit-5.1-dev \
+    libflatbuffers-dev \
+    libhwloc-dev \
+    libmnl-dev \
+    libnetfilter-queue-dev \
+    libunwind-dev \
+    libuuid1 \
+    uuid-dev \
+    ca-certificates \
+    flex \
+    bison \
     && rm -rf /var/lib/apt/lists/*
 
-# 🎯 FIX CHÍ MẠNG LỖI DAQ NFQ: 
-# Ép biên dịch libdaq nhắm thẳng vào thư mục lõi của Cisco (--prefix và --libdir)
-RUN git clone https://github.com/snort3/libdaq.git /tmp/libdaq \
+# Build libdaq from source (required for NFQUEUE/AFPACKET DAQ)
+RUN git clone --depth 1 https://github.com/snort3/libdaq.git /tmp/libdaq \
     && cd /tmp/libdaq \
     && ./bootstrap \
-    && ./configure --prefix=/home/snorty/snort3 --libdir=/home/snorty/snort3/lib \
-    && make \
+    && ./configure --prefix=/usr/local \
+    && make -j$(nproc) \
     && make install \
     && ldconfig \
     && rm -rf /tmp/libdaq
 
-# Gắn chặt đường dẫn thư viện để Linux linker không bị nhầm lẫn
-ENV LD_LIBRARY_PATH=/home/snorty/snort3/lib:$LD_LIBRARY_PATH
+# Ensure hwloc headers are findable
+RUN ln -sf /usr/include/x86_64-linux-gnu/hwloc*.h /usr/include/ 2>/dev/null || true
 
-# Cài đặt các thư viện lõi của dự án BK-IDS
-RUN pip3 install --no-cache-dir --break-system-packages pymysql psutil requests python-dotenv cryptography
+# Build Snort 3 from Cisco Talos official source
+ARG SNORT_VERSION=3.1.84.0
+RUN git clone --depth 1 --branch ${SNORT_VERSION} \
+    https://github.com/snort3/snort3.git /tmp/snort3 \
+    && cd /tmp/snort3 \
+    && export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH \
+    && ./configure_cmake.sh \
+        --prefix=/usr/local \
+        --with-daq-includes=/usr/local/include \
+        --with-daq-libraries=/usr/local/lib \
+    && cd build \
+    && make -j$(nproc) \
+    && make install \
+    && rm -rf /tmp/snort3
+
+# Build snort3-extra plugins (includes alert_json)
+RUN git clone --depth 1 \
+    https://github.com/snort3/snort3-extra.git /tmp/snort3-extra \
+    && cd /tmp/snort3-extra \
+    && export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH \
+    && ./configure_cmake.sh \
+        --prefix=/usr/local \
+    && cd build \
+    && make -j$(nproc) \
+    && make install \
+    && rm -rf /tmp/snort3-extra
+
+RUN ldconfig
+
+# ======================================================
+# Stage 2: Runtime image — minimal, clean
+# ======================================================
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    libpcap0.8 \
+    libpcre3 \
+    libdumbnet1 \
+    zlib1g \
+    liblzma5 \
+    libssl3 \
+    libnghttp2-14 \
+    libluajit-5.1-2 \
+    libflatbuffers23 \
+    libhwloc15 \
+    libmnl0 \
+    libnetfilter-queue1 \
+    libunwind8 \
+    iptables \
+    net-tools \
+    iputils-ping \
+    tcpdump \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy compiled binaries from builder
+COPY --from=builder /usr/local/bin/snort /usr/local/bin/snort
+COPY --from=builder /usr/local/lib/libdaq* /usr/local/lib/
+COPY --from=builder /usr/local/lib/daq/ /usr/local/lib/daq/
+COPY --from=builder /usr/local/lib/snort*/ /usr/local/lib/snort*/
+COPY --from=builder /usr/local/etc/snort/ /usr/local/etc/snort/
+
+RUN ldconfig
+
+# Install Python deps
+RUN pip3 install --no-cache-dir --break-system-packages \
+    pymysql psutil requests python-dotenv cryptography kafka-python
+
+# Create directories
+RUN mkdir -p /var/log/snort \
+    /etc/snort/rules \
+    /app/storage/pcaps/anomaly \
+    /app/storage/pcaps/signature \
+    /app/storage/pcaps/manual \
+    /app/logs
 
 WORKDIR /app
-
-# Xóa ENTRYPOINT mặc định của Cisco để không xung đột với docker-compose
 ENTRYPOINT []
-
-# Lệnh chờ vô tận để giữ container luôn sống
 CMD ["tail", "-f", "/dev/null"]

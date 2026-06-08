@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self' http://192.168.13.129:5050 ws://192.168.13.129:5050 https://cdn.jsdelivr.net; base-uri 'self'; form-action 'self'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>Bảng điều khiển — BK-IDS SOC</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/soc-dashboard.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+    <!-- ============================================ -->
+    <!-- ZERO TRUST AUTHENTICATION GUARD               -->
+    <!-- Chạy TRƯỚC khi DOM render                     -->
+    <!-- ============================================ -->
+    <script>
+        (function () {
+            'use strict';
+            var PUBLIC_ROUTES = ['/login', '/login.html', '/register', '/register.html'];
+            function isPublicRoute() {
+                var p = window.location.pathname;
+                for (var i = 0; i < PUBLIC_ROUTES.length; i++)if (p === PUBLIC_ROUTES[i]) return true;
+                if (p.indexOf('/login') === 0 || p.indexOf('/register') === 0) return true;
+                if (p.indexOf('/css/') === 0 || p.indexOf('/js/') === 0 || p.indexOf('/img/') === 0) return true;
+                return false;
+            }
+            function getToken() { return sessionStorage.getItem('bk_ids_token') }
+            function isTokenValid(t) {
+                if (!t) return false;
+                var parts = t.split('.');
+                if (parts.length !== 3) return false;
+                try {
+                    var payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+                    if (!payload.exp) return true;
+                    return (payload.exp * 1000) > Date.now();
+                } catch (e) { return false }
+            }
+            function guard() {
+                if (isPublicRoute()) return true;
+                var token = getToken();
+                if (!isTokenValid(token)) {
+                    try { sessionStorage.clear() } catch (e) { }
+                    try { localStorage.removeItem('bk_ids_token') } catch (e) { }
+                    try { localStorage.removeItem('auth_token') } catch (e) { }
+                    document.documentElement.innerHTML = '';
+                    window.location.replace('/login');
+                    return false;
+                }
+                return true;
+            }
+            if (!guard()) throw new Error('BK-IDS AUTH GUARD: Unauthorized');
+            window.addEventListener('focus', function () {
+                if (!guard()) throw new Error('BK-IDS AUTH GUARD: Session expired');
+            });
+        })();
+    </script>
+
+    <div id="app" class="d-flex" v-cloak>
+
+        <!-- ========== SIDEBAR ========== -->
+        <nav class="sidebar" :class="{ 'sidebar--collapsed': sidebarCollapsed }">
+            <div class="sidebar__brand">
+                <i class="fa-solid fa-shield-halved sidebar__logo"></i>
+                <span class="sidebar__brand-text" v-show="!sidebarCollapsed">BK-IDS <span
+                        class="sidebar__brand-sub">SOC</span></span>
+            </div>
+            <button class="sidebar__toggle" @click="sidebarCollapsed = !sidebarCollapsed">
+                <i :class="sidebarCollapsed ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-left'"></i>
+            </button>
+            <ul class="sidebar__menu">
+                <li class="sidebar__section-title" v-show="!sidebarCollapsed">Tổng quan</li>
+                <li class="sidebar__item">
+                    <a href="#" class="sidebar__link" :class="{ 'sidebar__link--active': activeTab === 'dashboard' }"
+                        @click.prevent="switchTab('dashboard')">
+                        <i class="fa-solid fa-chart-line sidebar__icon"></i>
+                        <span class="sidebar__label" v-show="!sidebarCollapsed">Bảng điều khiển</span>
+                    </a>
+                </li>
+                <li class="sidebar__section-title" v-show="!sidebarCollapsed">Hệ thống Bắt gói tin</li>
+                <li class="sidebar__item">
+                    <a href="#" class="sidebar__link"
+                        :class="{ 'sidebar__link--active': activeTab === 'capture-config' }"
+                        @click.prevent="switchTab('capture-config')">
+                        <i class="fa-solid fa-gear sidebar__icon"></i>
+                        <span class="sidebar__label" v-show="!sidebarCollapsed">Cấu hình & Tiền xử lý</span>
+                    </a>
+                </li>
+                <li class="sidebar__section-title" v-show="!sidebarCollapsed">Phát hiện Bất thường</li>
+                <li class="sidebar__item">
+                    <a href="#" class="sidebar__link" :class="{ 'sidebar__link--active': activeTab === 'sensor' }"
+                        @click.prevent="switchTab('sensor')">
+                        <i class="fa-solid fa-satellite-dish sidebar__icon"></i>
+                        <span class="sidebar__label" v-show="!sidebarCollapsed">Theo dõi Cảm biến</span>
+                    </a>
+                </li>
+                <li class="sidebar__item">
+                    <a href="#" class="sidebar__link"
+                        :class="{ 'sidebar__link--active': activeTab === 'anomaly-config' }"
+                        @click.prevent="switchTab('anomaly-config')">
+                        <i class="fa-solid fa-sliders sidebar__icon"></i>
+                        <span class="sidebar__label" v-show="!sidebarCollapsed">Cấu hình Ngưỡng</span>
+                    </a>
+                </li>
+                <li class="sidebar__section-title" v-show="!sidebarCollapsed">Phát hiện Lạm dụng</li>
+                <li class="sidebar__item">
+                    <a href="#" class="sidebar__link" :class="{ 'sidebar__link--active': activeTab === 'ips' }"
+                        @click.prevent="switchTab('ips')">
+                        <i class="fa-solid fa-fire-flame-curved sidebar__icon"></i>
+                        <span class="sidebar__label" v-show="!sidebarCollapsed">Theo dõi IPS</span>
+                    </a>
+                </li>
+                <li class="sidebar__item">
+                    <a href="#" class="sidebar__link"
+                        :class="{ 'sidebar__link--active': activeTab === 'alerts-explorer' }"
+                        @click.prevent="switchTab('alerts-explorer')">
+                        <i class="fa-solid fa-magnifying-glass sidebar__icon"></i>
+                        <span class="sidebar__label" v-show="!sidebarCollapsed">Truy vấn Cảnh báo</span>
+                    </a>
+                </li>
+                <li class="sidebar__item">
+                    <a href="#" class="sidebar__link" :class="{ 'sidebar__link--active': activeTab === 'rules' }"
+                        @click.prevent="switchTab('rules')">
+                        <i class="fa-solid fa-book sidebar__icon"></i>
+                        <span class="sidebar__label" v-show="!sidebarCollapsed">Cài đặt Luật (Snort 3)</span>
+                    </a>
+                </li>
+                <li class="sidebar__section-title" v-show="!sidebarCollapsed">Dữ liệu</li>
+                <li class="sidebar__item">
+                    <a href="#" class="sidebar__link" :class="{ 'sidebar__link--active': activeTab === 'packets' }"
+                        @click.prevent="switchTab('packets')">
+                        <i class="fa-solid fa-list sidebar__icon"></i>
+                        <span class="sidebar__label" v-show="!sidebarCollapsed">Danh sách Gói tin</span>
+                    </a>
+                </li>
+                <li class="sidebar__section-title" v-show="!sidebarCollapsed">Hệ thống</li>
+                <li class="sidebar__item">
+                    <a href="#" class="sidebar__link" :class="{ 'sidebar__link--active': activeTab === 'settings' }"
+                        @click.prevent="switchTab('settings')">
+                        <i class="fa-solid fa-gear sidebar__icon"></i>
+                        <span class="sidebar__label" v-show="!sidebarCollapsed">Cài đặt</span>
+                    </a>
+                </li>
+            </ul>
+            <div class="sidebar__footer" v-show="!sidebarCollapsed">
+                <span class="sidebar__version">v3.2.0 — Zero Trust</span>
+            </div>
+        </nav>
+
+        <!-- ========== MAIN LAYOUT ========== -->
+        <div class="main-layout">
+
+            <!-- Top Header -->
+            <header class="top-header">
+                <div class="top-header__left">
+                    <h1 class="top-header__title">{{ pageTitle }}</h1>
+                </div>
+                <div class="top-header__right">
+                    <span class="status-dot" :class="apiOnline ? 'status-dot--online' : 'status-dot--offline'">
+                        API {{ apiOnline ? 'Trực tuyến' : 'Ngoại tuyến' }}
+                        <span v-if="apiRetryCount > 0 && !apiOnline" style="font-size:.65rem;opacity:.7">(thử lại {{
+                            apiRetryCount }})</span>
+                    </span>
+                    <div class="header-icon" @click="switchTab('alerts-explorer')" v-if="criticalCount > 0">
+                        <i class="fa-solid fa-bell"></i>
+                        <span class="header-icon__badge">{{ criticalCount }}</span>
+                    </div>
+                    <div class="header-profile" @click="showProfile = !showProfile">
+                        <div class="header-profile__avatar avatar--admin">
+                            <i class="fa-solid fa-user-shield"></i>
+                        </div>
+                        <div class="d-none d-lg-block">
+                            <div class="header-profile__name">{{ userName }}</div>
+                            <div class="header-profile__role role--admin">Quản trị viên</div>
+                        </div>
+                        <div class="dropdown-menu dropdown-menu-dark" :class="{ 'show': showProfile }"
+                            style="position:absolute;top:100%;right:0;z-index:200;">
+                            <div class="dropdown-header">
+                                <div style="font-weight:600;font-size:.85rem">{{ userName }}</div>
+                                <div style="font-size:.7rem;color:#94a3b8;margin-top:2px"><i
+                                        class="fa-solid fa-shield-halved"></i> Quản trị viên — Toàn quyền</div>
+                            </div>
+                            <hr class="dropdown-divider">
+                            <a class="dropdown-item" href="#" @click.prevent="switchTab('settings')"><i
+                                    class="fa-solid fa-gear me-2"></i>Cài đặt</a>
+                            <hr class="dropdown-divider">
+                            <a class="dropdown-item text-danger" href="#" id="btn-logout" @click.prevent><i
+                                    class="fa-solid fa-right-from-bracket me-2"></i>Đăng xuất</a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Canvas — Tab fragments loaded via Dynamic Components (compiled by Vue) -->
+            <main class="main-canvas" id="tab-container">
+                <div class="tab-loading" v-if="tabLoading"><i class="fa-solid fa-circle-notch fa-spin me-2"></i>Đang
+                    tải...</div>
+                <component :is="currentTabDef" :key="currentTabKey" v-show="!tabLoading && currentTabDef"></component>
+            </main>
+
+        </div>
+
+        <!-- Toast Notifications -->
+        <div class="toast-container">
+            <transition-group name="toast">
+                <div v-for="toast in toasts" :key="toast.id" class="toast" :class="'toast--' + toast.type">
+                    <i class="fa-solid me-2"
+                        :class="{ 'fa-circle-check': toast.type==='success', 'fa-circle-xmark': toast.type==='error', 'fa-circle-info': toast.type==='info', 'fa-triangle-exclamation': toast.type==='warning' }"></i>
+                    {{ toast.message }}
+                </div>
+            </transition-group>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/services/api.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+
+</html>

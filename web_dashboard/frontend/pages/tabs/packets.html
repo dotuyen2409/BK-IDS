@@ -1,0 +1,18 @@
+<!-- pages/tabs/packets.html -->
+<section v-show="activeTab === 'packets'" class="view-section">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div><h2 style="margin:0;font-weight:600">Danh sách Gói tin đã Bắt</h2><p class="text-muted mb-0" style="font-size:.85rem">Phân tích sâu gói tin — Xem chi tiết tải trọng và siêu dữ liệu.</p></div>
+        <button class="btn btn-outline-info btn-sm" @click="fetchPackets">↻ Làm mới</button>
+    </div>
+    <div class="card-glass mb-5">
+        <div style="max-height:calc(100vh - 300px);overflow-y:auto">
+            <table class="table table-dark-custom table-hover mb-0">
+                <thead><tr><th>ID</th><th>Thời gian</th><th>IP Nguồn</th><th>IP Đích</th><th>Giao thức</th><th>Cổng</th><th>Kích thước</th><th>Cờ</th></tr></thead>
+                <tbody>
+                    <tr v-for="(pkt, idx) in packets" :key="idx"><td class="mono text-muted" style="font-size:.75rem">#{{ pkt.id }}</td><td class="mono text-muted" style="font-size:.75rem">{{ pkt.timestamp }}</td><td class="mono ip-cell">{{ pkt.ip_src }}</td><td class="mono ip-cell">{{ pkt.ip_dst }}</td><td><span class="badge" :class="'badge-' + (pkt.protocol || 'TCP').toLowerCase()">{{ pkt.protocol }}</span></td><td class="mono">{{ pkt.dst_port || '—' }}</td><td class="mono" style="color:var(--accent-cyan)">{{ pkt.size }} B</td><td class="mono text-muted">{{ pkt.flags || '—' }}</td></tr>
+                    <tr v-if="packets.length === 0"><td colspan="8" class="text-center py-5 text-muted">Chưa có gói tin nào được bắt.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

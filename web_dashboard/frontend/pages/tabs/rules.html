@@ -1,0 +1,452 @@
+<!-- pages/tabs/rules.html -->
+<!-- BK-IDS SOC — Snort 3 Rule Management (Enterprise Grade) -->
+<!-- PURE TEMPLATE: No <script> — all logic in app.js sharedSetup() -->
+<!-- XSS SAFE: Only Vue {{ }} interpolation, zero innerHTML -->
+<section v-show="activeTab === 'rules'" class="view-section">
+
+    <!-- ======== HEADER BAR ======== -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 style="margin:0;font-weight:600">
+                <i class="fa-solid fa-shield-halved" style="color:var(--accent-cyan)"></i>
+                Quản lý Luật Snort 3
+            </h2>
+            <p class="text-muted mb-0" style="font-size:.85rem">
+                Tạo, chỉnh sửa, kích hoạt / vô hiệu hóa luật phát hiện xâm nhập.
+            </p>
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <div class="position-relative">
+                <i class="fa-solid fa-search position-absolute"
+                    style="left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:.75rem"></i>
+                <input type="text" v-model="rulesSearch" class="form-dark form-control form-control-sm"
+                    placeholder="Tìm SID, msg, IP..." style="width:220px;padding-left:28px">
+            </div>
+
+            <button class="btn btn-outline-warning btn-sm shadow-sm" @click="fetchRules" :disabled="rulesLoading">
+                <i class="fa-solid fa-fire fa-beat-fade me-1"></i> Áp dụng Nóng
+            </button>
+
+            <button class="btn btn-outline-info btn-sm" @click="fetchRules" :disabled="rulesLoading">
+                <i class="fa-solid fa-rotate" :class="{ 'fa-spin': rulesLoading }"></i>
+            </button>
+            <button class="btn btn-sm" style="background:var(--accent-cyan);color:#000;font-weight:600"
+                @click="openCreateModal" :disabled="rulesLoading">
+                <i class="fa-solid fa-plus"></i> Thêm Luật
+            </button>
+        </div>
+    </div>
+
+    <!-- ======== ERROR BANNER ======== -->
+    <div v-if="rulesError" class="alert alert-danger d-flex align-items-center justify-content-between"
+        style="border-radius:10px;font-size:.85rem;margin-bottom:16px" role="alert">
+        <div class="d-flex align-items-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>{{ rulesError }}</span>
+        </div>
+        <button class="btn btn-sm btn-outline-light" @click="fetchRules" style="font-size:.75rem">
+            <i class="fa-solid fa-rotate"></i> Thử lại
+        </button>
+    </div>
+
+    <!-- ======== STATS CARDS ======== -->
+    <div class="row g-3 mb-4">
+        <div class="col-auto">
+            <div class="card-glass stat-card" style="min-width:130px">
+                <div class="stat-card__value" style="color:var(--accent-cyan)">{{ rules.length }}</div>
+                <div class="stat-card__label">Tổng luật</div>
+            </div>
+        </div>
+        <div class="col-auto">
+            <div class="card-glass stat-card" style="min-width:130px">
+                <div class="stat-card__value" style="color:#4ade80">{{ rulesOnCount }}</div>
+                <div class="stat-card__label">Đang bật</div>
+            </div>
+        </div>
+        <div class="col-auto">
+            <div class="card-glass stat-card" style="min-width:130px">
+                <div class="stat-card__value" style="color:#f87171">{{ rulesOffCount }}</div>
+                <div class="stat-card__label">Đã tắt</div>
+            </div>
+        </div>
+        <div class="col-auto">
+            <div class="card-glass stat-card" style="min-width:130px">
+                <div class="stat-card__value" style="color:var(--accent-purple)">{{ rulesDropCount }}</div>
+                <div class="stat-card__label">Drop</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======== TOAST ======== -->
+    <div v-if="rulesToast.show" class="alert rules-toast" :class="{
+             'alert-success': rulesToast.type === 'success',
+             'alert-danger': rulesToast.type === 'error',
+             'alert-warning': rulesToast.type === 'warning',
+             'alert-info': rulesToast.type === 'info'
+         }" role="alert"
+        style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px">
+            <i :class="{
+                'fa-solid fa-circle-check': rulesToast.type === 'success',
+                'fa-solid fa-circle-exclamation': rulesToast.type === 'error',
+                'fa-solid fa-triangle-exclamation': rulesToast.type === 'warning',
+                'fa-solid fa-circle-info': rulesToast.type === 'info'
+            }"></i>
+            <span>{{ rulesToast.message }}</span>
+        </div>
+        <button type="button" class="btn-close btn-close-white" @click="rulesToast.show = false"
+            aria-label="Đóng"></button>
+    </div>
+
+    <!-- ======== RULES TABLE ======== -->
+    <div class="card-glass mb-4">
+        <div style="max-height:calc(100vh - 420px);overflow-y:auto">
+            <table class="table table-dark-custom table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:50px;text-align:center">#</th>
+                        <th style="width:90px">SID</th>
+                        <th style="width:80px">Trạng thái</th>
+                        <th style="width:80px">Hành động</th>
+                        <th style="width:70px">Giao thức</th>
+                        <th>Nguồn</th>
+                        <th>Đích</th>
+                        <th style="min-width:180px">Thông điệp</th>
+                        <th style="width:160px;text-align:center">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Loading -->
+                    <tr v-if="rulesLoading && rules.length === 0">
+                        <td colspan="9" class="text-center py-5">
+                            <div class="d-flex flex-column align-items-center gap-3">
+                                <div class="spinner-border spinner-border-sm" style="color:var(--accent-cyan)"
+                                    role="status">
+                                    <span class="visually-hidden">Đang tải...</span>
+                                </div>
+                                <span class="text-muted" style="font-size:.85rem">Đang tải danh sách luật...</span>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Empty -->
+                    <tr v-if="!rulesLoading && !rulesError && rules.length === 0">
+                        <td colspan="9" class="text-center py-5">
+                            <div class="d-flex flex-column align-items-center gap-2">
+                                <i class="fa-solid fa-inbox" style="font-size:2rem;color:var(--text-muted)"></i>
+                                <span class="text-muted" style="font-size:.9rem">Chưa có luật nào</span>
+                                <span class="text-muted" style="font-size:.78rem">Nhấn "Thêm Luật" để tạo luật phát hiện
+                                    đầu tiên</span>
+                                <button class="btn btn-sm mt-2"
+                                    style="background:var(--accent-cyan);color:#000;font-weight:600"
+                                    @click="openCreateModal">
+                                    <i class="fa-solid fa-plus"></i> Thêm Luật
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- No search results -->
+                    <tr v-if="!rulesLoading && rules.length > 0 && filteredRules.length === 0">
+                        <td colspan="9" class="text-center py-5">
+                            <div class="d-flex flex-column align-items-center gap-2">
+                                <i class="fa-solid fa-search" style="font-size:1.5rem;color:var(--text-muted)"></i>
+                                <span class="text-muted" style="font-size:.85rem">Không tìm thấy luật phù hợp</span>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Data rows — XSS SAFE via Vue {{ }} auto-escape -->
+                    <tr v-for="(rule, idx) in filteredRules" :key="rule.sid || idx">
+                        <td class="text-center text-muted" style="font-size:.78rem">{{ idx + 1 }}</td>
+                        <td class="mono" style="color:var(--accent-cyan);font-weight:600">{{ rule.sid }}</td>
+                        <td>
+                            <label class="rules-toggle-switch"
+                                :title="rule.enabled !== false ? 'Đang bật — nhấn để tắt' : 'Đã tắt — nhấn để bật'">
+                                <input type="checkbox" :checked="rule.enabled !== false"
+                                    @change="toggleRuleStatus(rule, $event)" :disabled="!!rulesToggleLoading[rule.sid]">
+                                <span class="rules-toggle-slider">
+                                    <i v-if="rulesToggleLoading[rule.sid]" class="fa-solid fa-circle-notch fa-spin"
+                                        style="font-size:.6rem"></i>
+                                </span>
+                            </label>
+                        </td>
+                        <td>
+                            <span class="badge" :class="{
+                                      'badge-drop': rule.action === 'drop',
+                                      'badge-alert': rule.action === 'alert',
+                                      'badge-pass': rule.action === 'pass',
+                                      'badge-reject': rule.action === 'reject',
+                                      'badge-info': !['drop','alert','pass','reject'].includes(rule.action)
+                                  }">
+                                {{ rule.action }}
+                            </span>
+                        </td>
+                        <td><span class="badge badge-proto">{{ rule.protocol }}</span></td>
+                        <td class="mono" style="font-size:.82rem">{{ rule.sourceIp || rule.source }}</td>
+                        <td class="mono" style="font-size:.82rem">{{ rule.destIp || rule.destination }}</td>
+                        <td class="sig-cell"
+                            style="color:var(--accent-purple);font-size:.82rem;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                            :title="rule.msg">{{ rule.msg }}</td>
+                        <td>
+                            <div class="d-flex gap-1 justify-content-center">
+                                <button class="btn btn-sm btn-outline-info" @click="openEditModal(rule)"
+                                    title="Chỉnh sửa" :disabled="rulesFormLoading">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" @click="confirmDelete(rule)" title="Xóa"
+                                    :disabled="rulesFormLoading">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Table footer -->
+        <div class="d-flex justify-content-between align-items-center pt-3" style="border-top:1px solid var(--border)">
+            <span class="text-muted" style="font-size:.8rem">
+                Hiển thị {{ filteredRules.length }} / {{ rules.length }} luật
+            </span>
+            <div class="d-flex gap-2 align-items-center">
+                <button class="btn btn-sm btn-outline-secondary" :disabled="rulesPage <= 1"
+                    @click="rulesPage = rulesPage - 1">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <span class="text-muted" style="font-size:.8rem">Trang {{ rulesPage }}</span>
+                <button class="btn btn-sm btn-outline-secondary" :disabled="filteredRules.length < rulesPageSize"
+                    @click="rulesPage = rulesPage + 1">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======== CREATE / EDIT MODAL ======== -->
+    <div class="modal fade" id="ruleModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content"
+                style="background:var(--glass-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border);color:var(--text-primary);border-radius:16px">
+                <div class="modal-header" style="border-bottom:1px solid var(--border)">
+                    <div>
+                        <h5 class="modal-title" style="font-weight:600">
+                            <i :class="rulesIsEditing ? 'fa-solid fa-pen-to-square' : 'fa-solid fa-plus-circle'"
+                                style="color:var(--accent-cyan)"></i>
+                            {{ rulesIsEditing ? 'Chỉnh sửa Luật' : 'Thêm Luật Mới' }}
+                        </h5>
+                        <p class="text-muted mb-0" style="font-size:.78rem">
+                            {{ rulesIsEditing ? 'Cập nhật cấu hình luật phát hiện' : 'Tạo luật Snort 3 mới theo cấu trúc chuẩn' }}
+                        </p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" @click="closeRuleModal"
+                        aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body" style="padding:24px">
+                    <!-- Rule Header -->
+                    <div class="mb-4">
+                        <h6
+                            style="font-weight:600;color:var(--accent-cyan);margin-bottom:12px;font-size:.85rem;text-transform:uppercase;letter-spacing:.5px">
+                            <i class="fa-solid fa-code"></i> Rule Header (Phần đầu luật)
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label"
+                                    style="font-size:.8rem;color:var(--text-muted);margin-bottom:4px">Hành động
+                                    (Action)</label>
+                                <select v-model="rulesForm.action" class="form-dark form-select form-select-sm">
+                                    <option value="alert">alert — Cảnh báo</option>
+                                    <option value="drop">drop — Chặn & Ghi log</option>
+                                    <option value="reject">reject — Từ chối kết nối</option>
+                                    <option value="pass">pass — Bỏ qua</option>
+                                    <option value="log">log — Chỉ ghi log</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label"
+                                    style="font-size:.8rem;color:var(--text-muted);margin-bottom:4px">Giao thức
+                                    (Protocol)</label>
+                                <select v-model="rulesForm.protocol" class="form-dark form-select form-select-sm">
+                                    <option value="tcp">TCP</option>
+                                    <option value="udp">UDP</option>
+                                    <option value="icmp">ICMP</option>
+                                    <option value="ip">IP</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label"
+                                    style="font-size:.8rem;color:var(--text-muted);margin-bottom:4px">Hướng
+                                    (Direction)</label>
+                                <select v-model="rulesForm.direction" class="form-dark form-select form-select-sm">
+                                    <option value="->">-> (Một chiều)</option>
+                                    <option value="<>">&lt;&gt; (Hai chiều)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label"
+                                    style="font-size:.8rem;color:var(--text-muted);margin-bottom:4px">Revision
+                                    (Rev)</label>
+                                <input type="number" min="0" step="1" v-model="rulesForm.rev"
+                                    class="form-dark form-control form-control-sm" placeholder="1"
+                                    :class="{ 'is-invalid': rulesFormErrors.rev }">
+                                <div class="invalid-feedback" v-if="rulesFormErrors.rev" style="font-size:.75rem">{{
+                                    rulesFormErrors.rev }}</div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-4">
+                                <label class="form-label"
+                                    style="font-size:.8rem;color:var(--text-muted);margin-bottom:4px">Source IP</label>
+                                <input type="text" v-model="rulesForm.sourceIp"
+                                    class="form-dark form-control form-control-sm"
+                                    placeholder="$HOME_NET hoặc 192.168.1.0/24"
+                                    :class="{ 'is-invalid': rulesFormErrors.sourceIp }">
+                                <div class="invalid-feedback" v-if="rulesFormErrors.sourceIp" style="font-size:.75rem">
+                                    {{ rulesFormErrors.sourceIp }}</div>
+                                <div class="form-text" style="font-size:.7rem;color:var(--text-muted)">Hỗ trợ: IP, CIDR,
+                                    $HOME_NET, $EXTERNAL_NET, any</div>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label"
+                                    style="font-size:.8rem;color:var(--text-muted);margin-bottom:4px">Src Port</label>
+                                <input type="text" v-model="rulesForm.sourcePort"
+                                    class="form-dark form-control form-control-sm" placeholder="any"
+                                    :class="{ 'is-invalid': rulesFormErrors.sourcePort }">
+                                <div class="invalid-feedback" v-if="rulesFormErrors.sourcePort"
+                                    style="font-size:.75rem">{{ rulesFormErrors.sourcePort }}</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label"
+                                    style="font-size:.8rem;color:var(--text-muted);margin-bottom:4px">Dest IP</label>
+                                <input type="text" v-model="rulesForm.destIp"
+                                    class="form-dark form-control form-control-sm"
+                                    placeholder="$EXTERNAL_NET hoặc 10.0.0.1"
+                                    :class="{ 'is-invalid': rulesFormErrors.destIp }">
+                                <div class="invalid-feedback" v-if="rulesFormErrors.destIp" style="font-size:.75rem">{{
+                                    rulesFormErrors.destIp }}</div>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label"
+                                    style="font-size:.8rem;color:var(--text-muted);margin-bottom:4px">Dst Port</label>
+                                <input type="text" v-model="rulesForm.destPort"
+                                    class="form-dark form-control form-control-sm" placeholder="80"
+                                    :class="{ 'is-invalid': rulesFormErrors.destPort }">
+                                <div class="invalid-feedback" v-if="rulesFormErrors.destPort" style="font-size:.75rem">
+                                    {{ rulesFormErrors.destPort }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Rule Options -->
+                    <div class="mb-4">
+                        <h6
+                            style="font-weight:600;color:var(--accent-purple);margin-bottom:12px;font-size:.85rem;text-transform:uppercase;letter-spacing:.5px">
+                            <i class="fa-solid fa-sliders"></i> Rule Options (Tùy chọn luật)
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label"
+                                    style="font-size:.8rem;color:var(--text-muted);margin-bottom:4px">
+                                    SID <span style="color:var(--accent-cyan)">*</span>
+                                    <i class="fa-solid fa-wand-magic-sparkles ms-1"
+                                        style="font-size:.7rem;color:var(--accent-cyan);cursor:pointer"
+                                        title="Tự động tạo SID" @click="generateSid"></i>
+                                </label>
+                                <input type="text" v-model="rulesForm.sid"
+                                    class="form-dark form-control form-control-sm mono" placeholder="1000001"
+                                    :class="{ 'is-invalid': rulesFormErrors.sid }">
+                                <div class="invalid-feedback" v-if="rulesFormErrors.sid" style="font-size:.75rem">{{
+                                    rulesFormErrors.sid }}</div>
+                                <div class="form-text" style="font-size:.7rem;color:var(--text-muted)">SID phải >=
+                                    1000000</div>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label"
+                                    style="font-size:.8rem;color:var(--text-muted);margin-bottom:4px">Message (msg)
+                                    <span style="color:var(--accent-cyan)">*</span></label>
+                                <input type="text" v-model="rulesForm.msg"
+                                    class="form-dark form-control form-control-sm"
+                                    placeholder="ET MALWARE Suspicious inbound connection"
+                                    :class="{ 'is-invalid': rulesFormErrors.msg }">
+                                <div class="invalid-feedback" v-if="rulesFormErrors.msg" style="font-size:.75rem">{{
+                                    rulesFormErrors.msg }}</div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <label class="form-label"
+                                style="font-size:.8rem;color:var(--text-muted);margin-bottom:4px">Tùy chọn bổ sung
+                                (content, pcre, metadata...)</label>
+                            <textarea v-model="rulesForm.extraOptions" class="form-dark form-control mono" rows="4"
+                                placeholder='content:"malware";&#10;metadata:policy security-ips drop, ruleset community;&#10;classtype:trojan-activity;'
+                                style="font-size:.82rem;resize:vertical"></textarea>
+                            <div class="form-text" style="font-size:.7rem;color:var(--text-muted)">Mỗi tùy chọn trên một
+                                dòng, kết thúc bằng dấu chấm phẩy (;).</div>
+                        </div>
+                    </div>
+                    <!-- Live Preview -->
+                    <div class="mb-2">
+                        <h6 style="font-weight:600;color:var(--text-muted);margin-bottom:8px;font-size:.8rem">
+                            <i class="fa-solid fa-eye"></i> Xem trước luật Snort 3
+                        </h6>
+                        <div class="rule-preview-box">
+                            <code class="rule-preview-code">{{ rulesPreviewText }}</code>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid var(--border)">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="closeRuleModal"
+                        :disabled="rulesFormLoading">Hủy</button>
+                    <button type="button" class="btn btn-sm"
+                        style="background:var(--accent-cyan);color:#000;font-weight:600;min-width:120px"
+                        @click="submitRule" :disabled="rulesFormLoading">
+                        <span v-if="rulesFormLoading" class="spinner-border spinner-border-sm me-1" role="status"
+                            aria-hidden="true"></span>
+                        <i v-if="!rulesFormLoading"
+                            :class="rulesIsEditing ? 'fa-solid fa-save' : 'fa-solid fa-plus'"></i>
+                        {{ rulesFormLoading ? 'Đang lưu...' : (rulesIsEditing ? 'Cập nhật' : 'Tạo Luật') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======== DELETE CONFIRM MODAL ======== -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content"
+                style="background:var(--glass-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border);color:var(--text-primary);border-radius:16px">
+                <div class="modal-header" style="border-bottom:1px solid var(--border)">
+                    <h5 class="modal-title" style="font-weight:600;color:#f87171">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Xác nhận xóa
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @click="closeDeleteModal"
+                        aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body text-center py-4">
+                    <i class="fa-solid fa-trash"
+                        style="font-size:2rem;color:#f87171;margin-bottom:12px;display:block"></i>
+                    <p style="margin-bottom:4px;font-weight:500">Bạn có chắc muốn xóa luật?</p>
+                    <p class="text-muted" style="font-size:.82rem">
+                        SID: <strong style="color:var(--accent-cyan)">{{ rulesDeleteTarget ? rulesDeleteTarget.sid : ''
+                            }}</strong>
+                    </p>
+                    <p class="text-muted" style="font-size:.78rem">{{ rulesDeleteTarget ? rulesDeleteTarget.msg : '' }}
+                    </p>
+                    <p style="font-size:.75rem;color:#f87171;margin-top:8px">
+                        <i class="fa-solid fa-circle-exclamation"></i> Hành động này không thể hoàn tác!
+                    </p>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid var(--border);justify-content:center;gap:8px">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="closeDeleteModal"
+                        :disabled="rulesDeleteLoading">Hủy</button>
+                    <button type="button" class="btn btn-danger btn-sm" @click="executeDelete"
+                        :disabled="rulesDeleteLoading" style="min-width:100px">
+                        <span v-if="rulesDeleteLoading" class="spinner-border spinner-border-sm me-1" role="status"
+                            aria-hidden="true"></span>
+                        {{ rulesDeleteLoading ? 'Đang xóa...' : 'Xóa Luật' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

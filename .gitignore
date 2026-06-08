@@ -11,3 +11,11 @@ web_dashboard/backend_api/logs/
 # File lớn hoặc file tạm
 *.log
 *.pcap
+
+# Thư mục chứa log sinh ra tự động
+logs/*.txt
+snort_logs/*.txt
+snort_logs/*.json
+
+# File nhạy cảm
+storage/auth_users.json

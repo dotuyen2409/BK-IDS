@@ -12,11 +12,61 @@ import subprocess
 import re
 import queue
 import pymysql
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+
+# ========================================================================
+# IP VALIDATION HELPER — prevents command injection
+# ========================================================================
+_IPV4_RE = re.compile(
+    r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}"
+    r"(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+)
+
+def _validate_ip_safe(ip_str):
+    """Validate IPv4 address — returns cleaned IP or None."""
+    if not ip_str or not isinstance(ip_str, str):
+        return None
+    ip_str = ip_str.strip()
+    if not _IPV4_RE.match(ip_str):
+        return None
+    try:
+        parts = ip_str.split(".")
+        for p in parts:
+            num = int(p)
+            if num < 0 or num > 255:
+                return None
+        return ip_str
+    except (ValueError, AttributeError):
+        return None
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 sys.path.append('/app')
+from core_engine.soar_engine import load_whitelist_from_local_rules, _is_ip_whitelisted
+
+# ========================================================================
+# KAFKA, MITRE & PCAP IMPORTS (Sprint 1: Enterprise Pipeline)
+# ========================================================================
+try:
+    from kafka_producer import (
+        publish_signature_alert,
+        get_kafka_producer,
+    )
+    KAFKA_ENABLED = True
+except ImportError:
+    KAFKA_ENABLED = False
+
+try:
+    from mitre_mapper import map_attack_to_mitre
+    MITRE_ENABLED = True
+except ImportError:
+    MITRE_ENABLED = False
+
+try:
+    from pcap_engine import trigger_signature_pcap
+    PCAP_ENABLED = True
+except ImportError:
+    PCAP_ENABLED = False
 
 # ========================================================================
 # KIỂM TRA THƯ VIỆN LÕI
@@ -66,7 +116,6 @@ class BkSocIPSEngine:
         self.whitelist_ips = set(["127.0.0.1", "0.0.0.0"])
         
         self._auto_discover_whitelist()
-        self._load_ban_state() 
 
         signal.signal(signal.SIGINT, self.graceful_shutdown)
         signal.signal(signal.SIGTERM, self.graceful_shutdown)
@@ -140,19 +189,42 @@ class BkSocIPSEngine:
                     json.dump(self.active_bans, f)
             except Exception: pass
 
-    def run_host_command(self, cmd_string):
+    def run_host_command(self, cmd_list):
+        """Execute host command safely — uses list form, no shell=True."""
         try:
-            subprocess.run(cmd_string, shell=True, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception: pass
+            if isinstance(cmd_list, list):
+                subprocess.run(
+                    cmd_list, check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10,
+                    shell=False
+                )
+        except Exception:
+            pass
 
     def _enforce_iptables_drop(self, ip):
-        self.run_host_command(f"iptables -t mangle -C PREROUTING -s {ip} -j DROP 2>/dev/null || iptables -t mangle -I PREROUTING 1 -s {ip} -j DROP")
-        self.run_host_command(f"iptables -C DOCKER-USER -s {ip} -j DROP 2>/dev/null || iptables -I DOCKER-USER 1 -s {ip} -j DROP")
-        self.run_host_command(f"iptables -C INPUT -s {ip} -j DROP 2>/dev/null || iptables -I INPUT 1 -s {ip} -j DROP")
+        """Block IP safely — no shell=True, IP validated."""
+        if not _validate_ip_safe(ip):
+            self.logger.warning("[IPS] Invalid IP rejected: %s", ip)
+            return
+        # Check then add (mangle PREROUTING)
+        self.run_host_command(['iptables', '-t', 'mangle', '-C', 'PREROUTING', '-s', ip, '-j', 'DROP'])
+        self.run_host_command(['iptables', '-t', 'mangle', '-I', 'PREROUTING', '1', '-s', ip, '-j', 'DROP'])
+        # Check then add (DOCKER-USER)
+        self.run_host_command(['iptables', '-C', 'DOCKER-USER', '-s', ip, '-j', 'DROP'])
+        self.run_host_command(['iptables', '-I', 'DOCKER-USER', '1', '-s', ip, '-j', 'DROP'])
+        # Check then add (INPUT)
+        self.run_host_command(['iptables', '-C', 'INPUT', '-s', ip, '-j', 'DROP'])
+        self.run_host_command(['iptables', '-I', 'INPUT', '1', '-s', ip, '-j', 'DROP'])
 
     def _remove_iptables_drop(self, ip):
-        self.run_host_command(f"iptables -t mangle -D PREROUTING -s {ip} -j DROP 2>/dev/null")
-        self.run_host_command(f"iptables -D DOCKER-USER -s {ip} -j DROP 2>/dev/null")
+        """Unblock IP safely — no shell=True, IP validated."""
+        if not _validate_ip_safe(ip):
+            return
+        self.run_host_command(['iptables', '-t', 'mangle', '-D', 'PREROUTING', '-s', ip, '-j', 'DROP'])
+        self.run_host_command(['iptables', '-D', 'DOCKER-USER', '-s', ip, '-j', 'DROP'])
+        self.run_host_command(['iptables', '-D', 'INPUT', '-s', ip, '-j', 'DROP'])
         self.run_host_command(f"iptables -D INPUT -s {ip} -j DROP 2>/dev/null")
 
     def get_db_connection(self):
@@ -260,12 +332,18 @@ class BkSocIPSEngine:
                     )
 
     def is_noise_ip(self, ip_str):
-        if ip_str in self.whitelist_ips: return True
+        # Dynamically load latest whitelist rules from local.rules
+        whitelist = load_whitelist_from_local_rules()
+        # Ensure our autodiscovered local IPs are also checked
+        for lip in self.whitelist_ips:
+            whitelist.add(lip)
+        if _is_ip_whitelisted(ip_str, whitelist):
+            return True
         try:
             ip_obj = ipaddress.ip_address(ip_str)
             if ip_obj.is_multicast or ip_obj.is_link_local or ip_obj.is_loopback: return True
-            if ip_obj in ipaddress.ip_network('172.16.0.0/12'): return True
-        except ValueError: return True
+        except ValueError:
+            return True
         return False
 
     # ---------------------------------------------------------
@@ -279,28 +357,33 @@ class BkSocIPSEngine:
             clean_ip = str(ip_obj)
         except ValueError: return
 
-        # Chống chém lặp
-        if clean_ip in self.active_bans: return
-
-        with self.ban_lock:
-            self.active_bans[clean_ip] = time.time() + self.config['BAN_DURATION']
-
-        # 🎯 VÁ LỖI CHÍ MẠNG: Ép đồng bộ RAM xuống Ổ cứng ngay lập tức!
-        self._save_ban_state()
-
-        self._enforce_iptables_drop(clean_ip)
-        self.metrics['ips_dropped'] += 1
-        self.logger.warning(f"{Colors.RED}🛑 [FIREWALL] PHONG TỎA IP {clean_ip} | Vi phạm: {reason}{Colors.ENDC}")
-
-        # Bắn Telegram chi tiết khi chặt đứt IP
-        alert_msg = (
-            f"🛑 <b>MÁY CHẾM IPS ĐÃ KÍCH HOẠT</b>\n"
-            f"┣ <b>Mục tiêu bị chặn:</b> <code>{clean_ip}</code>\n"
-            f"┣ <b>Chữ ký Mã độc:</b> {reason}\n"
-            f"┣ <b>Thời gian cấm:</b> {self.config['BAN_DURATION']} giây\n"
-            f"┗ <b>Hành động:</b> Đã đóng ngàm Iptables (DOCKER-USER)."
-        )
-        self.executor.submit(self.send_telegram_alert, alert_msg, "CRITICAL")
+        try:
+            from soar_engine import get_soar_engine
+            engine = get_soar_engine()
+            
+            soar_alert = {
+                "src_ip": clean_ip,
+                "severity": "CRITICAL",
+                "attack_type": reason,
+                "confidence": 0.99
+            }
+            
+            result = engine.process_critical_alert(soar_alert)
+            if result.get("blocked"):
+                self.metrics['ips_dropped'] += 1
+                self.logger.warning(f"{Colors.RED}🛑 [FIREWALL] PHONG TỎA IP {clean_ip} QUA SOAR | Vi phạm: {reason}{Colors.ENDC}")
+                
+                # Bắn Telegram chi tiết khi chặt đứt IP
+                alert_msg = (
+                    f"🛑 <b>MÁY CHẾM IPS ĐÃ KÍCH HOẠT</b>\n"
+                    f"┣ <b>Mục tiêu bị chặn:</b> <code>{clean_ip}</code>\n"
+                    f"┣ <b>Chữ ký Mã độc:</b> {reason}\n"
+                    f"┣ <b>Thời gian cấm:</b> {self.config['BAN_DURATION']} giây\n"
+                    f"┗ <b>Hành động:</b> Đã phong tỏa qua SOAR."
+                )
+                self.executor.submit(self.send_telegram_alert, alert_msg, "CRITICAL")
+        except Exception as e:
+            self.logger.error("Lỗi tích hợp SOAR Engine: %s", str(e))
 
     def process_alert(self, line):
         try:
@@ -394,7 +477,51 @@ class BkSocIPSEngine:
             
             if not self.db_queue.full():
                 self.db_queue.put((local_time, src_ip, dst_ip, clean_msg, protocol, action_db))
-        except Exception as e: 
+
+            # ==================================================================
+            # SPRINT 1: Kafka + MITRE + PCAP Integration
+            # ==================================================================
+            # 1. MITRE ATT&CK Mapping
+            mitre_mapping = {}
+            if MITRE_ENABLED:
+                try:
+                    mitre_mapping = map_attack_to_mitre(clean_msg)
+                except Exception as e:
+                    self.logger.warning(f"[MITRE] Mapping error: {e}")
+
+            # 2. Kafka Alert Publishing
+            if KAFKA_ENABLED:
+                try:
+                    alert_id = f"SIG-{datetime.now(tz_vn).strftime('%Y%m%d%H%M%S')}-{src_ip}"
+                    self.executor.submit(
+                        publish_signature_alert,
+                        src_ip=src_ip,
+                        dst_ip=dst_ip,
+                        sig_name=clean_msg,
+                        protocol=protocol,
+                        action=action_db,
+                        mitre_mapping=mitre_mapping,
+                        sid=sid if 'sid' in dir() else None,
+                        alert_id=alert_id,
+                    )
+                except Exception as e:
+                    self.logger.warning(f"[KAFKA] Publish error: {e}")
+
+            # 3. PCAP Forensics Capture (triggered on DROP/BLOCK actions)
+            if PCAP_ENABLED and action_db == "DROP":
+                try:
+                    alert_id = f"SIG-PCAP-{datetime.now(tz_vn).strftime('%Y%m%d%H%M%S')}-{src_ip}"
+                    self.executor.submit(
+                        trigger_signature_pcap,
+                        alert_id=alert_id,
+                        sig_name=clean_msg,
+                        src_ip=src_ip,
+                        dst_ip=dst_ip,
+                    )
+                except Exception as e:
+                    self.logger.warning(f"[PCAP] Capture error: {e}")
+
+        except Exception as e:
             self.logger.error(f"❌ Lỗi đọc Log Snort 3: {e}")
 
     def db_writer_worker(self):
@@ -521,7 +648,6 @@ class BkSocIPSEngine:
     def graceful_shutdown(self, sig, frame):
         self.logger.info(f"\n{Colors.YELLOW}🔻 Nhận lệnh ngắt. Đang giải phóng bộ nhớ và Iptables...{Colors.ENDC}")
         self.is_running = False
-        self._save_ban_state() 
         self.executor.shutdown(wait=False)
         if self.snort_process:
             try:
@@ -532,7 +658,6 @@ class BkSocIPSEngine:
 
     def run(self):
         threading.Thread(target=self.config_updater_worker, daemon=True).start()
-        threading.Thread(target=self.ban_manager_worker, daemon=True).start()
         threading.Thread(target=self.db_writer_worker, daemon=True).start()
         threading.Thread(target=self.snort_watchdog_worker, daemon=True).start()
         threading.Thread(target=self.metrics_worker, daemon=True).start()

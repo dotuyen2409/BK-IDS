@@ -1,0 +1,42 @@
+[
+  {
+    "timestamp": "2026-06-05T17:32:19.813828",
+    "action": "DISABLE",
+    "sid": 100001,
+    "detail": "Tắt luật SID 100001",
+    "user": "unknown",
+    "ip": "N/A"
+  },
+  {
+    "timestamp": "2026-06-05T17:41:21.276018",
+    "action": "DISABLE",
+    "sid": 100001,
+    "detail": "Tắt luật SID 100001",
+    "user": "unknown",
+    "ip": "N/A"
+  },
+  {
+    "timestamp": "2026-06-05T17:41:51.638190",
+    "action": "ENABLE",
+    "sid": 100001,
+    "detail": "Bật luật SID 100001",
+    "user": "unknown",
+    "ip": "N/A"
+  },
+  {
+    "timestamp": "2026-06-05T17:46:44.977012",
+    "action": "ENABLE",
+    "sid": 100001,
+    "detail": "Bật luật SID 100001",
+    "user": "unknown",
+    "ip": "N/A"
+  },
+  {
+    "timestamp": "2026-06-05T17:48:06.594147",
+    "action": "DISABLE",
+    "sid": 100001,
+    "detail": "Tắt luật SID 100001",
+    "user": "admin",
+    "ip": "172.18.0.4"
+  }
+]

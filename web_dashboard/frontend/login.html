@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self' http://192.168.13.129:5050 ws://192.168.13.129:5050; base-uri 'self'; form-action 'self'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>Đăng nhập — BK-IDS SOC</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root{--bg:#020617;--surface:#0f172a;--elevated:#1e293b;--border:#334155;--text:#f8fafc;--text2:#94a3b8;--muted:#475569;--cyan:#06b6d4;--red:#ef4444;--green:#10b981;--yellow:#f59e0b;--purple:#a855f7}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+        .bg{position:fixed;inset:0;z-index:0;background:linear-gradient(rgba(6,182,212,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(6,182,212,.03) 1px,transparent 1px);background-size:60px 60px}
+        .bg::before{content:'';position:absolute;top:-300px;left:-300px;width:600px;height:600px;border-radius:50%;background:var(--cyan);filter:blur(150px);opacity:.1}
+        .bg::after{content:'';position:absolute;bottom:-300px;right:-300px;width:600px;height:600px;border-radius:50%;background:var(--purple);filter:blur(150px);opacity:.08}
+        .card{position:relative;z-index:1;width:100%;max-width:420px;margin:20px;background:rgba(15,23,42,.9);border:1px solid var(--border);border-radius:20px;padding:44px 36px;box-shadow:0 0 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.03);backdrop-filter:blur(20px)}
+        .logo{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+        .logo-icon{width:42px;height:42px;background:linear-gradient(135deg,var(--cyan),#0891b2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#fff;box-shadow:0 4px 15px rgba(6,182,212,.3)}
+        .logo-text{font-size:1.35rem;font-weight:800;letter-spacing:-.5px}
+        .logo-text span{color:var(--cyan)}
+        .subtitle{font-size:.8rem;color:var(--muted);margin-bottom:28px;line-height:1.5}
+        .field{margin-bottom:16px}
+        .field label{display:block;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text2);margin-bottom:6px}
+        .input-wrap{position:relative}
+        .input-wrap i.icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.82rem;transition:color .2s}
+        .input-wrap input{width:100%;padding:11px 38px 11px 38px;background:rgba(2,6,23,.6);border:1.5px solid var(--border);border-radius:10px;color:var(--text);font-size:.85rem;font-family:'Inter',sans-serif;transition:all .2s}
+        .input-wrap input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(6,182,212,.1)}
+        .input-wrap input:focus~i.icon{color:var(--cyan)}
+        .input-wrap input::placeholder{color:#334155}
+        .input-wrap input:disabled{opacity:.4;cursor:not-allowed}
+        .toggle-pw{position:absolute;right:11px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:4px}
+        .toggle-pw:hover{color:var(--text2)}
+        .options{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+        .remember{display:flex;align-items:center;gap:7px;font-size:.76rem;color:var(--text2);cursor:pointer}
+        .remember input{display:none}
+        .remember .box{width:14px;height:14px;border:1.5px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .2s}
+        .remember input:checked+.box{background:var(--cyan);border-color:var(--cyan)}
+        .remember .box i{font-size:.5rem;color:#fff;opacity:0;transition:opacity .2s}
+        .remember input:checked+.box i{opacity:1}
+        .forgot{font-size:.76rem;color:var(--cyan);text-decoration:none;font-weight:500}
+        .forgot:hover{color:#22d3ee}
+        .btn{width:100%;padding:12px;border:none;border-radius:10px;font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;cursor:pointer;transition:all .25s;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;box-shadow:0 4px 15px rgba(220,38,38,.25)}
+        .btn:hover{box-shadow:0 6px 25px rgba(220,38,38,.35);transform:translateY(-1px)}
+        .btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+        .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .5s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .alert{padding:10px 13px;border-radius:8px;font-size:.76rem;margin-bottom:16px;display:flex;align-items:center;gap:8px;animation:slideIn .25s ease}
+        @keyframes slideIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+        .alert-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5}
+        .alert-ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);color:#6ee7b7}
+        .divider{display:flex;align-items:center;gap:12px;margin:18px 0;font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+        .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+        .quick{display:flex;gap:8px}
+        .quick-btn{flex:1;padding:9px;background:rgba(2,6,23,.4);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:.68rem;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:5px;font-family:'Inter',sans-serif}
+        .quick-btn:hover{border-color:#334155;color:#e2e8f0}
+        .dot{width:6px;height:6px;border-radius:50%}
+        .dot.red{background:var(--red)}
+        .footer{margin-top:20px;text-align:center}
+        .footer a{font-size:.68rem;color:var(--muted);text-decoration:none;transition:color .2s}
+        .footer a:hover{color:var(--text2)}
+        .footer-copy{font-size:.62rem;color:#334155;margin-top:6px}
+        .secure{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:12px;font-size:.65rem;color:var(--muted)}
+        .secure i{color:var(--green);font-size:.68rem}
+        @media(max-width:480px){.card{padding:32px 22px;margin:12px}}
+    </style>
+</head>
+<body>
+<div class="bg"></div>
+
+<div class="card" id="app">
+    <div class="logo">
+        <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <div class="logo-text">BK-IDS <span>SOC</span></div>
+    </div>
+    <p class="subtitle">Trung tâm Điều phối An ninh — Nền tảng giám sát và phản ứng sự cố</p>
+
+    <div v-if="error" class="alert alert-err"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div>
+    <div v-if="success" class="alert alert-ok"><i class="fa-solid fa-circle-check"></i> {{ success }}</div>
+
+    <form @submit.prevent="login" novalidate>
+        <div class="field">
+            <label>Tên đăng nhập</label>
+            <div class="input-wrap">
+                <input type="text" v-model="username" placeholder="Nhập tên đăng nhập..." :disabled="loading" autocomplete="username" autofocus>
+                <i class="fa-regular fa-id-card icon"></i>
+            </div>
+        </div>
+        <div class="field">
+            <label>Mật khẩu</label>
+            <div class="input-wrap">
+                <input :type="showPw ? 'text' : 'password'" v-model="password" placeholder="Nhập mật khẩu..." :disabled="loading" autocomplete="current-password">
+                <i class="fa-solid fa-key icon"></i>
+                <button type="button" class="toggle-pw" @click="showPw = !showPw" tabindex="-1">
+                    <i :class="showPw ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+                </button>
+            </div>
+        </div>
+        <div class="options">
+            <label class="remember">
+                <input type="checkbox" v-model="remember">
+                <span class="box"><i class="fa-solid fa-check"></i></span>
+                Ghi nhớ đăng nhập
+            </label>
+            <a href="#" class="forgot" @click.prevent="forgot">Quên mật khẩu?</a>
+        </div>
+        <button type="submit" class="btn" :disabled="loading || !username || !password">
+            <template v-if="loading"><span class="spin"></span> ĐANG XÁC THỰC...</template>
+            <template v-else><i class="fa-solid fa-right-to-bracket"></i> ĐĂNG NHẬP</template>
+        </button>
+    </form>
+
+    <div class="divider">Nhanh chóng</div>
+    <div class="quick">
+        <button type="button" class="quick-btn" @click="fillAdmin"><span class="dot red"></span> admin / admin123</button>
+    </div>
+
+    <div class="footer">
+        <a href="#"><i class="fa-solid fa-book"></i> Tài liệu</a>
+        <span style="margin:0 8px;color:#334155">|</span>
+        <a href="#"><i class="fa-solid fa-headset"></i> Hỗ trợ</a>
+        <div class="footer-copy">&copy; 2026 BK-IDS SOC v3.2.0</div>
+        <div class="secure"><i class="fa-solid fa-lock"></i> TLS 1.3 &mdash; JWT Bearer &mdash; Zero Trust</div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="/js/services/api.js"></script>
+<script>
+(function(){
+    // Cleanup old keys
+    try{localStorage.removeItem('auth_token')}catch(e){}
+    try{localStorage.removeItem('bk_ids_token')}catch(e){}
+
+    // If already authenticated, go to dashboard
+    if(TokenManager&&TokenManager.isAuthenticated()){
+        window.location.replace('/');
+        return;
+    }
+
+    var createApp=Vue.createApp;
+    var ref=Vue.ref;
+
+    createApp({
+        setup:function(){
+            var username=ref('');
+            var password=ref('');
+            var error=ref('');
+            var success=ref('');
+            var loading=ref(false);
+            var showPw=ref(false);
+            var remember=ref(false);
+
+            var saved=localStorage.getItem('bk_ids_remember_user');
+            if(saved){username.value=saved;remember.value=true}
+
+            function fillAdmin(){username.value='admin';password.value='admin123';error.value=''}
+            function forgot(){error.value='';success.value='Liên hệ Quản trị viên: admin@bk-ids.local';setTimeout(function(){success.value=''},4000)}
+
+            function login(){
+                error.value='';success.value='';
+                if(!username.value.trim()){error.value='Vui lòng nhập tên đăng nhập.';return}
+                if(!password.value){error.value='Vui lòng nhập mật khẩu.';return}
+                loading.value=true;
+                API.auth.login(username.value.trim(),password.value)
+                .then(function(data){
+                    if(data.status==='success'){
+                        if(remember.value)localStorage.setItem('bk_ids_remember_user',username.value.trim());
+                        else localStorage.removeItem('bk_ids_remember_user');
+                        success.value='Đăng nhập thành công! Đang chuyển hướng...';
+                        setTimeout(function(){window.location.replace('/')},600);
+                    }else{
+                        error.value=data.message||'Sai thông tin đăng nhập.';
+                    }
+                })
+                .catch(function(e){
+                    var msg=e.message||'';
+                    if(msg.indexOf('401')!==-1)error.value='Sai tên đăng nhập hoặc mật khẩu.';
+                    else if(msg.indexOf('Network')!==-1||msg.indexOf('timed out')!==-1)error.value='Không kết nối được API.';
+                    else error.value=msg||'Lỗi không xác định.';
+                })
+                .finally(function(){loading.value=false});
+            }
+
+            return{username:username,password:password,error:error,success:success,loading:loading,showPw:showPw,remember:remember,fillAdmin:fillAdmin,forgot:forgot,login:login};
+        }
+    }).mount('#app');
+})();
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-# /home/bk_ids/bk-ids/web_dashboard/backend_api/config/database.py
+# /home/ids/bk_ids/bk-ids/web_dashboard/backend_api/config/database.py
 
 import mysql.connector
 import os
@@ -11,6 +11,7 @@ def get_db_connection():
     Kết nối Cơ sở dữ liệu thông minh (Dual-Connect Strategy)
     Tự động tương thích với cả API Server và Sensor Host-mode.
     """
+    db_host = os.environ.get('MYSQL_HOST', 'bkids_mysql')
     db_port = int(os.environ.get('MYSQL_PORT', 3306))
     db_user = os.environ.get('MYSQL_USER')
     db_pass = os.environ.get('MYSQL_PASSWORD')
@@ -20,23 +21,24 @@ def get_db_connection():
         logger.error(" LỖI BẢO MẬT: Thiếu thông tin cấu hình DB.")
         return None
 
-    # BƯỚC 1: Thử kết nối thông qua mạng ảo Docker (Dành riêng cho API Server)
+    # BƯỚC 1: Thử kết nối thông qua mạng ảo Docker
     try:
         return mysql.connector.connect(
-            host='bkids_mysql', 
-            port=db_port, user=db_user, password=db_pass, database=db_name, 
-            connect_timeout=2, auth_plugin='mysql_native_password'
+            host=db_host,
+            port=db_port, user=db_user, password=db_pass, database=db_name,
+            connect_timeout=3, auth_plugin='mysql_native_password'
         )
-    except:
-        # BƯỚC 2: Nếu thất bại, thử kết nối qua Localhost (Dành riêng cho Lõi Sensor Host-mode)
+    except Exception as e1:
+        logger.warning(f"Không kết nối được qua {db_host}: {e1}")
+        # BƯỚC 2: Fallback qua localhost
         try:
             return mysql.connector.connect(
-                host='127.0.0.1', 
-                port=db_port, user=db_user, password=db_pass, database=db_name, 
-                connect_timeout=2, auth_plugin='mysql_native_password'
+                host='127.0.0.1',
+                port=db_port, user=db_user, password=db_pass, database=db_name,
+                connect_timeout=3, auth_plugin='mysql_native_password'
             )
-        except Exception as e:
-            logger.error(f" KHÔNG THỂ KẾT NỐI DATABASE CẢ 2 CÁCH: {e}")
+        except Exception as e2:
+            logger.error(f" KHÔNG THỂ KẾT NỐI DATABASE CẢ 2 CÁCH: host={db_host} err={e1}, localhost err={e2}")
             return None
 
 def get_direct_db_connection():
