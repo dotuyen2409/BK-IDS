@@ -294,6 +294,9 @@
             async blockIp(ip) {
                 return request('/soar/block', { method: 'POST', body: JSON.stringify({ ip: ip }) });
             },
+            async updateBlockDuration(ip, duration) {
+                return request('/soar/update_duration', { method: 'POST', body: JSON.stringify({ ip: ip, duration: duration }) });
+            },
         },
 
         rules: {

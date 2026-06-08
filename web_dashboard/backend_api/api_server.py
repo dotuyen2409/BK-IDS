@@ -740,6 +740,43 @@ def soar_manual_unblock():
     return jsonify({'status': 'success', 'message': 'IP ' + ip + ' unblocked'}), 200
 
 
+@app.route('/api/soar/update_duration', methods=['POST', 'OPTIONS'])
+@require_jwt_auth
+@require_role(Role.ADMIN)
+def soar_update_duration():
+    """Update ban duration of an active block — admin only."""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    data = request.get_json(force=True)
+    ip = data.get('ip', '')
+    duration = data.get('duration')
+    if not sanitize_ip(ip) or duration is None:
+        return jsonify({'status': 'error', 'message': 'Invalid IP or duration'}), 400
+
+    try:
+        duration = int(duration)
+    except ValueError:
+        return jsonify({'status': 'error', 'message': 'Invalid duration format'}), 400
+
+    try:
+        conn = _get_db()
+        with conn.cursor() as cur:
+            cur.execute('UPDATE soar_blocks SET ban_duration_sec = %s '
+                        'WHERE ip = %s AND is_active = 1', (duration, ip))
+            affected = cur.rowcount
+        conn.close()
+        
+        if affected == 0:
+            return jsonify({'status': 'error', 'message': 'Active block not found for IP'}), 404
+            
+    except Exception as e:
+        logger.error("[SOAR] DB update error: %s", e)
+        return jsonify({'status': 'error', 'message': 'Database error'}), 500
+
+    logger.info("[SOAR] Updated block duration for %s to %s sec by %s", ip, duration, g.current_user.get('username'))
+    return jsonify({'status': 'success', 'message': 'Block duration updated'}), 200
+
+
 # =================================================================
 # BANNED IPS (legacy compatibility — reads soar_blocks table)
 # =================================================================

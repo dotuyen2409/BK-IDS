@@ -30,10 +30,36 @@
                 <table class="table table-dark-custom table-hover mb-0">
                     <thead><tr><th>IP Bị khóa</th><th>Thời gian mở khóa</th><th>Lớp Mạng</th><th>Hành động</th></tr></thead>
                     <tbody>
-                        <tr v-for="(item, idx) in explorerBanned" :key="idx"><td class="mono text-danger fw-bold">{{ item.ip }}</td><td class="mono text-muted"><span v-if="item.unban_time">{{ formatTime(item.unban_time) }}</span><span v-else>Vĩnh viễn</span></td><td><span class="badge badge-drop">IPTABLES L3</span></td><td><button class="btn btn-sm btn-outline-success" @click="unbanExplorerIP(item.ip)">🔓 Bỏ Chặn</button></td></tr>
+                        <tr v-for="(item, idx) in explorerBanned" :key="idx"><td class="mono text-danger fw-bold">{{ item.ip }}</td><td class="mono text-muted"><span v-if="item.unban_time">{{ formatTime(item.unban_time) }}</span><span v-else>Vĩnh viễn</span></td><td><span class="badge badge-drop">IPTABLES L3</span></td><td><div class="btn-group"><button class="btn btn-sm btn-outline-warning" @click="openEditBanModal(item)">⏱ Điều chỉnh</button><button class="btn btn-sm btn-outline-success" @click="unbanExplorerIP(item.ip)">🔓 Bỏ Chặn</button></div></td></tr>
                         <tr v-if="explorerBanned.length === 0"><td colspan="4" class="text-center py-5 text-success">Tường lửa đang sạch. Không có IP nào bị phong tỏa.</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="editBanModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modal-dark">
+                <div class="modal-header border-bottom-0"><h5 class="modal-title" style="color:var(--accent-yellow)">⏱ Điều chỉnh thời gian chặn</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body py-4">
+                    <p class="text-muted mb-3">Chỉnh sửa thời gian chặn cho IP: <strong class="text-white">{{ editBanTargetIP }}</strong></p>
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Thời gian chặn (giây)</label>
+                        <select v-model="editBanDuration" class="form-select form-select-dark mb-2">
+                            <option :value="3600">1 Giờ (3600s)</option>
+                            <option :value="86400">1 Ngày (86400s)</option>
+                            <option :value="604800">1 Tuần (604800s)</option>
+                            <option :value="31536000">1 Năm (31536000s)</option>
+                        </select>
+                        <input type="number" v-model.number="editBanDuration" class="form-control form-dark" placeholder="Hoặc nhập số giây tùy chỉnh">
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 bg-darker">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-warning" @click="submitEditBan" :disabled="editBanLoading">
+                        <span v-if="editBanLoading" class="spinner-border spinner-border-sm me-2"></span>Cập nhật
+                    </button>
+                </div>
             </div>
         </div>
     </div>

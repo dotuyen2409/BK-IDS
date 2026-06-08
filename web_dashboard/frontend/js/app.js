@@ -104,6 +104,9 @@
     var explorerAlerts = Vue.reactive([]);
     var explorerBanned = Vue.reactive([]);
     var explorerBannedCount = Vue.computed(function () { return explorerBanned.length; });
+    var editBanTargetIP = Vue.ref('');
+    var editBanDuration = Vue.ref(3600);
+    var editBanLoading = Vue.ref(false);
     var explorerFilteredAlerts = Vue.computed(function () {
         var result = explorerAlerts.slice();
         if (explorerFilters.ip) { var q = explorerFilters.ip.toLowerCase(); result = result.filter(function (a) { return (a.ip_src || '').toLowerCase().indexOf(q) !== -1; }); }
@@ -451,6 +454,11 @@
                 fetchExplorerAlerts: fetchExplorerAlerts,
                 fetchExplorerBanned: fetchExplorerBanned,
                 unbanExplorerIP: unbanExplorerIP,
+                editBanTargetIP: editBanTargetIP,
+                editBanDuration: editBanDuration,
+                editBanLoading: editBanLoading,
+                openEditBanModal: openEditBanModal,
+                submitEditBan: submitEditBan,
                 formatTime: formatTime,
                 recentAlerts: recentAlerts,
                 selectedPacket: selectedPacket,
@@ -972,6 +980,48 @@
         API.soar.unblockIp(ip)
             .then(function (res) { if (res.status === 'success') { var idx = explorerBanned.findIndex(function (i) { return i.ip === ip; }); if (idx > -1) explorerBanned.splice(idx, 1); showToast('Đã gỡ chặn ' + ip, 'success'); } })
             .catch(function () { showToast('Lỗi gỡ chặn', 'error'); });
+    }
+
+    function openEditBanModal(item) {
+        editBanTargetIP.value = item.ip;
+        var currentDuration = 86400; // default 1 day
+        if (item.unban_time) {
+            var now = Math.floor(Date.now() / 1000);
+            var remaining = Math.max(0, item.unban_time - now);
+            if (remaining > 0) currentDuration = remaining;
+        }
+        editBanDuration.value = currentDuration;
+        
+        var el = document.getElementById('editBanModal');
+        if (el && window.bootstrap) {
+            var m = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
+            m.show();
+        }
+    }
+
+    function submitEditBan() {
+        if (!editBanTargetIP.value) return;
+        editBanLoading.value = true;
+        API.soar.updateBlockDuration(editBanTargetIP.value, editBanDuration.value)
+            .then(function (res) {
+                if (res.status === 'success' || res.status === 'ok') {
+                    showToast('Đã cập nhật thời gian chặn cho ' + editBanTargetIP.value, 'success');
+                    var el = document.getElementById('editBanModal');
+                    if (el && window.bootstrap) {
+                        var m = bootstrap.Modal.getInstance(el);
+                        if (m) m.hide();
+                    }
+                    fetchExplorerBanned();
+                } else {
+                    showToast('Lỗi cập nhật: ' + (res.message || 'Không xác định'), 'error');
+                }
+            })
+            .catch(function (err) {
+                showToast('Lỗi cập nhật: ' + (err.message || 'Không xác định'), 'error');
+            })
+            .finally(function () {
+                editBanLoading.value = false;
+            });
     }
 
     // ---- Rules ----
