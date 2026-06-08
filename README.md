@@ -1,11 +1,11 @@
 <h1 align="center">
   <img src="https://img.icons8.com/color/96/000000/shield.png" alt="BK-IDS Logo" width="80"/>
   <br>
-  BK-IDS: Next-Gen Intrusion Prevention System & SOC Dashboard
+  BK-IDS: Anomaly-Based Intrusion Detection System
 </h1>
 
 <p align="center">
-  <strong>Hệ thống Giám sát An ninh Mạng và Phản ứng Sự cố (SOAR) Tự động hóa</strong>
+  <strong>Hệ thống Phát hiện Xâm nhập dựa trên Bất thường</strong>
 </p>
 
 <p align="center">
@@ -19,13 +19,13 @@
 
 ---
 
-## 🛡️ Tổng quan (Overview)
+##  Tổng quan (Overview)
 
 **BK-IDS** là một hệ thống Phòng chống Xâm nhập Thế hệ mới (NGIPS) kết hợp cùng Bảng điều khiển Trung tâm Điều hành An ninh (SOC Dashboard). Được thiết kế theo kiến trúc Microservices linh hoạt, BK-IDS cung cấp khả năng phân tích lưu lượng mạng theo thời gian thực, kiểm tra gói tin chuyên sâu (DPI) và tự động hóa toàn bộ quá trình phản ứng sự cố (SOAR).
 
 Dự án được xây dựng hướng tới khả năng xử lý tốc độ cao, trễ thấp thông qua việc can thiệp trực tiếp vào tầng Data Link (Layer 2) bằng công nghệ zero-copy, đồng thời tự động hóa các rào chắn tường lửa ở tầng Network (Layer 3) để chống lại các luồng tấn công độc hại ngay lập tức.
 
-## ✨ Tính năng cốt lõi (Core Features)
+##  Tính năng cốt lõi (Core Features)
 
 - **Phân tích Lưu lượng Thời gian thực & DPI:** Bắt và phân tích gói tin trực tiếp ở chế độ zero-copy. Hỗ trợ bóc tách payload Base64 và hiển thị dưới dạng Hex Dump chuyên sâu (tương tự Wireshark) ngay trên giao diện web.
 - **Phát hiện Tấn công Đa lớp (Signature & Anomaly):** Tích hợp engine Snort 3 mạnh mẽ để đối sánh các dấu hiệu tấn công đã biết (SQL Injection, XSS, DoS, Path Traversal, Malware) kết hợp cùng thuật toán phát hiện hành vi bất thường (CUSUM).
@@ -33,7 +33,7 @@ Dự án được xây dựng hướng tới khả năng xử lý tốc độ ca
 - **Quản lý Luật thông minh (Rules Management):** Giao diện quản lý trực quan cho phép kỹ sư bảo mật thêm, sửa, xóa, và bật/tắt các luật Snort 3. Hệ thống tự động biên dịch (compile) và reload lõi phân tích mà không gây gián đoạn mạng.
 - **Báo cáo & Giám sát Trực quan:** Dashboard cung cấp các biểu đồ thống kê chuyên sâu về lưu lượng truy cập, tình trạng tài nguyên hệ thống (CPU, RAM), và tự động phân loại cảnh báo theo mức độ rủi ro (Critical, High, Medium, Low).
 
-## 📸 Giao diện Hệ thống (Screenshots)
+##  Giao diện Hệ thống (Screenshots)
 
 > **Lưu ý:** Vui lòng thay thế đường dẫn ảnh `docs/images/...` bằng đường dẫn ảnh thực tế của dự án.
 
@@ -55,7 +55,7 @@ Dự án được xây dựng hướng tới khả năng xử lý tốc độ ca
   <em>Trang Quản lý Luật Snort 3</em>
 </p>
 
-## 🏗️ Kiến trúc Hệ thống (Architecture)
+##  Kiến trúc Hệ thống (Architecture)
 
 Hệ thống hoạt động theo luồng dữ liệu 4 bước khép kín:
 1. **Packet Capture:** `Snort 3` sử dụng `AF_PACKET` socket ở chế độ Promiscuous để lấy gói tin trực tiếp từ card mạng (ens33/eth0) mà không cần sao chép bộ nhớ (zero-copy), tối ưu CPU.
@@ -84,7 +84,7 @@ Hệ thống hoạt động theo luồng dữ liệu 4 bước khép kín:
 - **MySQL 8.0:** Lưu trữ cảnh báo, cấu hình quản trị và lịch sử chặn IP.
 - **Docker & Docker Compose:** Đóng gói và cô lập toàn bộ 7 dịch vụ (microservices) để dễ dàng triển khai.
 
-## 🚀 Triển khai Hệ thống (Deployment)
+##  Triển khai Hệ thống (Deployment)
 
 Dự án được chứa trong Docker Compose giúp việc khởi tạo môi trường trở nên đồng nhất trên bất kỳ hệ điều hành Linux nào.
 
@@ -113,7 +113,7 @@ sudo docker-compose ps
 - Mở trình duyệt web và truy cập qua Nginx Portal Gateway: `http://<IP_ADDRESS>:9000/soc-admin/`
 - Thông tin đăng nhập mặc định sẽ nằm trong tài liệu hướng dẫn bàn giao hoặc qua bảng `auth_users` được cấp phép.
 
-## 📁 Cấu trúc Thư mục Chính
+##  Cấu trúc Thư mục Chính
 
 ```text
 /bk_ids/
